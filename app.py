@@ -80,6 +80,14 @@ def grafico_barras(df, x, y, titulo, cor=None):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def normalizar_visitas(serie):
+    s = serie.astype(str).str.strip()
+    s = s.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "N/A": pd.NA, "-": pd.NA})
+    s = s.str.replace(".", "", regex=False)
+    s = s.str.replace(",", ".", regex=False)
+    return pd.to_numeric(s, errors="coerce").fillna(0)
+
+
 def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col):
     centro = [dados[lat_col].mean(), dados[lon_col].mean()]
     mapa = folium.Map(location=centro, zoom_start=13)
@@ -253,7 +261,8 @@ def preparar_diabetes(df):
     df["Sem avaliação dos pés"] = df[mapa["pes"]] == "N"
     df["Não acompanhado"] = df[mapa["acomp"]] == "N"
     df["Cadastro desatualizado"] = df[mapa["cadastro"]] == "N"
-    df["Sem visita"] = pd.to_numeric(df[mapa["visitas"]], errors="coerce").fillna(0) == 0
+    df["Visitas Normalizadas"] = normalizar_visitas(df[mapa["visitas"]])
+    df["Sem visita"] = df["Visitas Normalizadas"] <= 0
     df["Pontuação Prioridade"] = (
         df["Sem consulta"].astype(int)
         + df["Sem PA"].astype(int)
@@ -290,7 +299,8 @@ def preparar_hipertensao(df):
     df["Sem PA"] = df[mapa["pa"]] == "N"
     df["Não acompanhado"] = df[mapa["acomp"]] == "N"
     df["Cadastro desatualizado"] = df[mapa["cadastro"]] == "N"
-    df["Sem visita"] = pd.to_numeric(df[mapa["visitas"]], errors="coerce").fillna(0) == 0
+    df["Visitas Normalizadas"] = normalizar_visitas(df[mapa["visitas"]])
+    df["Sem visita"] = df["Visitas Normalizadas"] <= 0
     df["Pontuação Prioridade"] = (
         df["Sem consulta"].astype(int)
         + df["Sem PA"].astype(int)
@@ -308,7 +318,7 @@ def render_diabetes(df):
     filtrado = aplicar_filtros_base(df, m["equipe"], m["micro"], "Prioridade")
     total = len(filtrado)
     pct = lambda col: f"{((filtrado[col] == 'S').mean() * 100 if total else 0):.1f}%"
-    pct_visita = f"{(((pd.to_numeric(filtrado[m['visitas']], errors='coerce').fillna(0) > 0).mean() * 100) if total else 0):.1f}%"
+    pct_visita = f"{(((filtrado['Visitas Normalizadas'] > 0).mean() * 100) if total else 0):.1f}%"
     exibir_metricas([
         ("Total", total),
         ("Consulta", pct(m["consulta"])),
@@ -345,7 +355,7 @@ def render_hipertensao(df):
     filtrado = aplicar_filtros_base(df, m["equipe"], m["micro"], "Prioridade")
     total = len(filtrado)
     pct = lambda col: f"{((filtrado[col] == 'S').mean() * 100 if total else 0):.1f}%"
-    pct_visita = f"{(((pd.to_numeric(filtrado[m['visitas']], errors='coerce').fillna(0) > 0).mean() * 100) if total else 0):.1f}%"
+    pct_visita = f"{(((filtrado['Visitas Normalizadas'] > 0).mean() * 100) if total else 0):.1f}%"
     exibir_metricas([
         ("Total", total),
         ("Consulta", pct(m["consulta"])),
