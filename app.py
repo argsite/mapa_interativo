@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
-from folium.plugins import MarkerCluster
+from folium.plugins import MarkerCluster, HeatMap
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
@@ -16,6 +16,8 @@ if "area_col_atual" not in st.session_state:
     st.session_state.area_col_atual = None
 if "modo_atual" not in st.session_state:
     st.session_state.modo_atual = None
+if "tipo_mapa" not in st.session_state:
+    st.session_state.tipo_mapa = "MarkerCluster"
 
 st.title("📍 Dashboard de Saúde - Rastreamento Territorial")
 st.markdown("Envie uma planilha com endereços ou coordenadas para visualizar os pacientes no mapa.")
@@ -48,6 +50,13 @@ if uploaded_file:
         area_col = st.selectbox("Selecione a coluna de Microárea (opcional)", [None] + cols)
         st.session_state.area_col_atual = area_col
 
+        tipo_mapa = st.radio(
+            "Tipo de visualização do mapa",
+            ["MarkerCluster", "Mapa de calor"],
+            index=0 if st.session_state.tipo_mapa == "MarkerCluster" else 1
+        )
+        st.session_state.tipo_mapa = tipo_mapa
+
         if st.button("Gerar mapa com coordenadas existentes"):
             if lat_col and lon_col:
                 df_mapa = df.copy()
@@ -71,6 +80,13 @@ if uploaded_file:
         endereco_col = st.selectbox("Selecione a coluna com o endereço completo", cols, index=None)
         area_col = st.selectbox("Selecione a coluna de Microárea (opcional)", [None] + cols)
         st.session_state.area_col_atual = area_col
+
+        tipo_mapa = st.radio(
+            "Tipo de visualização do mapa",
+            ["MarkerCluster", "Mapa de calor"],
+            index=0 if st.session_state.tipo_mapa == "MarkerCluster" else 1
+        )
+        st.session_state.tipo_mapa = tipo_mapa
 
         complemento = st.text_input(
             "Complemento para melhorar a busca (opcional)",
@@ -160,25 +176,35 @@ if uploaded_file:
             centro_lat = df_mapa_final["latitude"].mean()
             centro_lon = df_mapa_final["longitude"].mean()
             mapa = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
-            marker_cluster = MarkerCluster().add_to(mapa)
-            cores = ["red", "blue", "green", "purple", "orange", "darkred"]
             area_col = st.session_state.area_col_atual
+            tipo_mapa = st.session_state.tipo_mapa
+            cores = ["red", "blue", "green", "purple", "orange", "darkred"]
 
-            for _, row in df_mapa_final.iterrows():
-                cor = "gray"
-                if area_col and area_col in df_mapa_final.columns:
-                    idx = hash(str(row[area_col])) % len(cores)
-                    cor = cores[idx]
+            if tipo_mapa == "MarkerCluster":
+                marker_cluster = MarkerCluster().add_to(mapa)
 
-                folium.Marker(
-                    location=[row["latitude"], row["longitude"]],
-                    popup=f"Paciente: {row.get('Paciente', 'N/A')}",
-                    tooltip=f"Microárea: {row.get(area_col, 'N/A') if area_col else 'N/A'}",
-                    icon=folium.Icon(color=cor)
-                ).add_to(marker_cluster)
+                for _, row in df_mapa_final.iterrows():
+                    cor = "gray"
+                    if area_col and area_col in df_mapa_final.columns:
+                        idx = hash(str(row[area_col])) % len(cores)
+                        cor = cores[idx]
 
-            st.write("### Mapa")
-            st.caption("Marcadores próximos serão agrupados automaticamente para facilitar a visualização.")
+                    folium.Marker(
+                        location=[row["latitude"], row["longitude"]],
+                        popup=f"Paciente: {row.get('Paciente', 'N/A')}",
+                        tooltip=f"Microárea: {row.get(area_col, 'N/A') if area_col else 'N/A'}",
+                        icon=folium.Icon(color=cor)
+                    ).add_to(marker_cluster)
+
+                st.write("### Mapa")
+                st.caption("Visualização em marcadores agrupados para facilitar a navegação.")
+
+            else:
+                heat_data = df_mapa_final[["latitude", "longitude"]].dropna().values.tolist()
+                HeatMap(heat_data, radius=18, blur=12).add_to(mapa)
+                st.write("### Mapa")
+                st.caption("Visualização em mapa de calor para destacar áreas com maior concentração de registros.")
+
             st_folium(mapa, width=1000, height=600, returned_objects=[])
 else:
     st.info("Aguardando upload da planilha...")
