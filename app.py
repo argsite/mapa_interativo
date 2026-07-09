@@ -148,6 +148,16 @@ def converter_enderecos(df, col_endereco, col_lat, col_lon):
     return df
 
 
+
+
+def identificar_linha_cuidado(df):
+    cols = [str(c).strip() for c in df.columns]
+    if "Hemoglobina Glicada" in cols or "Avaliação dos pés" in cols:
+        return "Diabetes"
+    if "Aferição de pressão arterial" in cols:
+        return "Hipertensão"
+    return None
+
 def dataframe_para_excel_bytes(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
