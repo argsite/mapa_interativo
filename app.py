@@ -4,6 +4,7 @@ import pandas as pd
 from io import BytesIO
 import plotly.express as px
 import folium
+from folium.plugins import MarkerCluster, HeatMap
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
@@ -88,10 +89,19 @@ def normalizar_visitas(serie):
     return pd.to_numeric(s, errors="coerce").fillna(0)
 
 
-def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col):
+def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col, modo_mapa="Agrupado"):
     centro = [dados[lat_col].mean(), dados[lon_col].mean()]
     mapa = folium.Map(location=centro, zoom_start=13)
     cores = ["red", "blue", "green", "purple", "orange", "darkred", "cadetblue", "darkgreen"]
+
+    if modo_mapa == "Calor":
+        pontos = dados[[lat_col, lon_col]].dropna().values.tolist()
+        if pontos:
+            HeatMap(pontos, radius=18, blur=14, min_opacity=0.35).add_to(mapa)
+        return mapa
+
+    camada = MarkerCluster().add_to(mapa) if modo_mapa == "Agrupado" else mapa
+
     for _, row in dados.iterrows():
         cor = "gray"
         if area_col and area_col in dados.columns:
@@ -103,7 +113,7 @@ def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col):
             popup=popup,
             tooltip=tooltip,
             icon=folium.Icon(color=cor),
-        ).add_to(mapa)
+        ).add_to(camada)
     return mapa
 
 
@@ -168,11 +178,13 @@ def render_mapa(df, titulo_secao):
     lat_col = st.selectbox("Latitude", lat_options, index=0 if "Latitude" in lat_options else None, key=f"lat_{titulo_secao}")
     lon_col = st.selectbox("Longitude", lon_options, index=0 if "Longitude" in lon_options else None, key=f"lon_{titulo_secao}")
 
-    c4, c5 = st.columns([1, 2])
+    c4, c5, c6 = st.columns([1, 2, 1.3])
     with c4:
         converter = st.checkbox("Converter endereços automaticamente", key=f"check_conv_{titulo_secao}")
     with c5:
         st.caption("Use essa opção só se a planilha ainda não tiver latitude e longitude.")
+    with c6:
+        modo_mapa = st.selectbox("Tipo de mapa", ["Agrupado", "Pontos", "Calor"], key=f"modo_{titulo_secao}")
 
     if converter:
         if st.button("Converter e preparar mapa", key=f"conv_{titulo_secao}"):
@@ -215,6 +227,7 @@ def render_mapa(df, titulo_secao):
                     "nome_col": nome_col,
                     "endereco_col": endereco_col,
                     "area_col": area_col,
+                    "modo_mapa": modo_mapa,
                 }
                 st.success("Mapa gerado com sucesso.")
 
@@ -228,6 +241,7 @@ def render_mapa(df, titulo_secao):
             cfg["nome_col"],
             cfg["endereco_col"],
             cfg["area_col"],
+            cfg.get("modo_mapa", "Agrupado"),
         )
         st_folium(mapa, width=None, height=650)
 
