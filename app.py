@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
+from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
@@ -159,6 +160,7 @@ if uploaded_file:
             centro_lat = df_mapa_final["latitude"].mean()
             centro_lon = df_mapa_final["longitude"].mean()
             mapa = folium.Map(location=[centro_lat, centro_lon], zoom_start=13)
+            marker_cluster = MarkerCluster().add_to(mapa)
             cores = ["red", "blue", "green", "purple", "orange", "darkred"]
             area_col = st.session_state.area_col_atual
 
@@ -173,9 +175,10 @@ if uploaded_file:
                     popup=f"Paciente: {row.get('Paciente', 'N/A')}",
                     tooltip=f"Microárea: {row.get(area_col, 'N/A') if area_col else 'N/A'}",
                     icon=folium.Icon(color=cor)
-                ).add_to(mapa)
+                ).add_to(marker_cluster)
 
             st.write("### Mapa")
+            st.caption("Marcadores próximos serão agrupados automaticamente para facilitar a visualização.")
             st_folium(mapa, width=1000, height=600, returned_objects=[])
 else:
     st.info("Aguardando upload da planilha...")
