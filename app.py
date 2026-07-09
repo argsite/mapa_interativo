@@ -112,49 +112,47 @@ def converter_enderecos(df, col_endereco, col_lat, col_lon):
 
 def render_mapa(df, titulo_secao):
     st.subheader(f"Mapa territorial - {titulo_secao}")
-    st.markdown("Selecione as colunas para montar o mapa e, se necessário, converta os endereços em latitude/longitude antes da geração.")
-
     cols = df.columns.tolist()
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        nome_col = st.selectbox("Coluna do nome do paciente", cols, index=cols.index("Nome Completo") if "Nome Completo" in cols else 0, key=f"nome_{titulo_secao}")
-    with c2:
-        endereco_col = st.selectbox("Coluna do endereço", cols, index=cols.index("Endereço") if "Endereço" in cols else 0, key=f"end_{titulo_secao}")
-    with c3:
-        area_col = st.selectbox("Coluna da microárea", cols, index=cols.index("Microárea") if "Microárea" in cols else 0, key=f"micro_{titulo_secao}")
-
-    c4, c5 = st.columns(2)
-    with c4:
-        lat_col = st.selectbox("Coluna de Latitude", [None] + cols, key=f"lat_{titulo_secao}")
-    with c5:
-        lon_col = st.selectbox("Coluna de Longitude", [None] + cols, key=f"lon_{titulo_secao}")
-
-    sugestao_lat = "Latitude"
-    sugestao_lon = "Longitude"
-
-    with st.expander("Converter endereços em latitude e longitude"):
-        nova_lat = st.text_input("Nome da coluna de latitude a criar/usar", value=sugestao_lat, key=f"nova_lat_{titulo_secao}")
-        nova_lon = st.text_input("Nome da coluna de longitude a criar/usar", value=sugestao_lon, key=f"nova_lon_{titulo_secao}")
-        if st.button("Converter endereços", key=f"conv_{titulo_secao}"):
-            if not endereco_col:
-                st.error("Selecione a coluna de endereço antes de converter.")
-            else:
-                try:
-                    df_convertido = converter_enderecos(df, endereco_col, nova_lat, nova_lon)
-                    st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
-                    st.success("Endereços convertidos. Agora selecione as novas colunas de latitude e longitude.")
-                    st.dataframe(df_convertido[[c for c in [nome_col, endereco_col, area_col, nova_lat, nova_lon] if c in df_convertido.columns]].head(20), use_container_width=True)
-                except Exception as e:
-                    st.error(f"Erro na conversão de endereços: {e}")
-
     df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df)
 
+    nome_default = cols.index("Nome Completo") if "Nome Completo" in cols else 0
+    endereco_default = cols.index("Endereço") if "Endereço" in cols else 0
+    area_default = cols.index("Microárea") if "Microárea" in cols else 0
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        nome_col = st.selectbox("Nome do paciente", cols, index=nome_default, key=f"nome_{titulo_secao}")
+    with c2:
+        endereco_col = st.selectbox("Endereço", cols, index=endereco_default, key=f"end_{titulo_secao}")
+    with c3:
+        area_col = st.selectbox("Microárea", cols, index=area_default, key=f"micro_{titulo_secao}")
+
+    lat_options = ["Latitude"] + [c for c in cols if c != "Latitude"]
+    lon_options = ["Longitude"] + [c for c in cols if c != "Longitude"]
+    lat_col = st.selectbox("Latitude", lat_options, index=0 if "Latitude" in lat_options else None, key=f"lat_{titulo_secao}")
+    lon_col = st.selectbox("Longitude", lon_options, index=0 if "Longitude" in lon_options else None, key=f"lon_{titulo_secao}")
+
+    c4, c5 = st.columns([1, 2])
+    with c4:
+        converter = st.checkbox("Converter endereços automaticamente", key=f"check_conv_{titulo_secao}")
+    with c5:
+        st.caption("Use essa opção só se a planilha ainda não tiver latitude e longitude.")
+
+    if converter:
+        if st.button("Converter e preparar mapa", key=f"conv_{titulo_secao}"):
+            try:
+                df_convertido = converter_enderecos(df_mapa, endereco_col, "Latitude", "Longitude")
+                st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
+                st.success("Conversão concluída. As colunas Latitude e Longitude foram preparadas.")
+                df_mapa = df_convertido
+            except Exception as e:
+                st.error(f"Erro na conversão de endereços: {e}")
+
+    df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df_mapa)
+
     if st.button("Gerar mapa", key=f"gerar_{titulo_secao}"):
-        if not lat_col or not lon_col:
-            st.error("Selecione as colunas de latitude e longitude.")
-            return
         if lat_col not in df_mapa.columns or lon_col not in df_mapa.columns:
-            st.error("As colunas de latitude/longitude selecionadas não existem na tabela atual.")
+            st.error("Não encontrei as colunas de latitude e longitude. Marque a opção de conversão ou selecione colunas válidas.")
             return
 
         dados = df_mapa.copy()
