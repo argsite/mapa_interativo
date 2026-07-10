@@ -848,4 +848,3 @@ else:
             render_diabetes(df)
     except Exception as e:
         st.error(f"Não foi possível processar a planilha: {e}")
- 
