@@ -803,13 +803,13 @@ def render_hipertensao(df):
     render_mapa(filtrado, "Hipertensão")
 
 
-secao = st.sidebar.radio("Linha de cuidado", ["Hipertensão", "Diabetes"])
 arquivo = st.file_uploader("Envie a planilha correspondente", type=["xlsx", "xls", "csv"])
 
 with st.expander("Como usar"):
     st.markdown("""
-    - Escolha a linha de cuidado na barra lateral.
-    - Envie a planilha correspondente daquela seção.
+    - Envie a planilha correspondente.
+    - O sistema tenta identificar automaticamente se o relatório é de hipertensão ou diabetes.
+    - Se necessário, você pode corrigir manualmente a linha de cuidado.
     - Use os filtros por equipe, microárea, faixa etária e prioridade.
     - A tabela nominal ajuda na organização da busca ativa.
     - Na parte do mapa, você pode selecionar nome, endereço, microárea, latitude e longitude.
@@ -821,6 +821,27 @@ if arquivo is None:
 else:
     try:
         df = carregar_planilha(arquivo)
+        linha_detectada, origem = detectar_linha_cuidado(df, arquivo.name)
+
+        if linha_detectada is None:
+            st.warning("Não foi possível identificar automaticamente a linha de cuidado. Escolha manualmente abaixo.")
+            secao = st.radio("Linha de cuidado", ["Hipertensão", "Diabetes"], horizontal=True, key="linha_manual_principal")
+            origem = "manual"
+        else:
+            secao = linha_detectada
+            trocar = st.checkbox("Trocar linha de cuidado manualmente", key="trocar_linha_cuidado")
+            if trocar:
+                secao = st.radio(
+                    "Linha de cuidado",
+                    ["Hipertensão", "Diabetes"],
+                    index=0 if secao == "Hipertensão" else 1,
+                    horizontal=True,
+                    key="linha_detectada_editavel",
+                )
+                origem = "manual"
+
+        exibir_cabecalho_analise(secao, origem)
+
         if secao == "Hipertensão":
             render_hipertensao(df)
         else:
