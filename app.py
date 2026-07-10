@@ -720,7 +720,7 @@ def render_diabetes(df):
     ])
     c1, c2 = st.columns(2)
     with c1:
-        g1 = filtrado.groupby(m["micro"], dropna=False)["Não acompanhado"].sum().reset_index().sort_values("Não acompanhado", ascending=False)
+        g1 = filtrado[filtrado["Prioridade"] == "Alta"].groupby(m["micro"], dropna=False).size().reset_index(name="Prioridade Alta").sort_values("Prioridade Alta", ascending=False)
         grafico_barras(g1, m["micro"], "Prioridade Alta", "Prioridade alta por microárea")
     with c2:
         pend = pd.DataFrame({
