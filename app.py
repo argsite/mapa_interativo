@@ -453,7 +453,15 @@ def render_diabetes(df):
     if somente_criticos:
         lista_inteligente = lista_inteligente[lista_inteligente["Pontuação Prioridade"] > 0]
     cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], "Prioridade", "Pontuação Prioridade", "Motivo da busca ativa", "Ação sugerida", m["consulta"], m["pa"], m["hba1c"], m["pes"], m["visitas"], m["acomp"]]
-    st.dataframe(lista_inteligente[[c for c in cols if c in lista_inteligente.columns]], use_container_width=True)
+    lista_exportacao = lista_inteligente[[c for c in cols if c in lista_inteligente.columns]].copy()
+    st.download_button(
+        label="Exportar lista nominal inteligente (Excel)",
+        data=dataframe_para_excel_bytes(lista_exportacao),
+        file_name="lista_nominal_inteligente_diabetes.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="download_lista_diabetes",
+    )
+    st.dataframe(lista_exportacao, use_container_width=True)
     render_mapa(filtrado, "Diabetes")
 
 
@@ -494,7 +502,15 @@ def render_hipertensao(df):
     if somente_criticos:
         lista_inteligente = lista_inteligente[lista_inteligente["Pontuação Prioridade"] > 0]
     cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], "Prioridade", "Pontuação Prioridade", "Motivo da busca ativa", "Ação sugerida", m["consulta"], m["pa"], m["visitas"], m["acomp"]]
-    st.dataframe(lista_inteligente[[c for c in cols if c in lista_inteligente.columns]], use_container_width=True)
+    lista_exportacao = lista_inteligente[[c for c in cols if c in lista_inteligente.columns]].copy()
+    st.download_button(
+        label="Exportar lista nominal inteligente (Excel)",
+        data=dataframe_para_excel_bytes(lista_exportacao),
+        file_name="lista_nominal_inteligente_hipertensao.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="download_lista_hipertensao",
+    )
+    st.dataframe(lista_exportacao, use_container_width=True)
     render_mapa(filtrado, "Hipertensão")
 
 
