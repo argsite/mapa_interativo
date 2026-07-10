@@ -306,28 +306,49 @@ def render_mapa(df, titulo_secao):
     with c3:
         area_col = st.selectbox("Microárea", cols, index=area_default, key=f"micro_{titulo_secao}")
 
+    df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df_mapa)
+    ja_tem_coordenadas = "Latitude" in df_mapa.columns and "Longitude" in df_mapa.columns
+
     lat_options = ["Latitude"] + [c for c in cols if c != "Latitude"]
     lon_options = ["Longitude"] + [c for c in cols if c != "Longitude"]
-    lat_col = st.selectbox("Latitude", lat_options, index=0 if "Latitude" in lat_options else None, key=f"lat_{titulo_secao}")
-    lon_col = st.selectbox("Longitude", lon_options, index=0 if "Longitude" in lon_options else None, key=f"lon_{titulo_secao}")
+    lat_col = st.selectbox("Latitude", lat_options, index=0, key=f"lat_{titulo_secao}")
+    lon_col = st.selectbox("Longitude", lon_options, index=0, key=f"lon_{titulo_secao}")
 
-    c4, c5, c6 = st.columns([1, 2, 1.3])
+    c4, c5, c6 = st.columns([1.2, 2, 1.3])
     with c4:
-        converter = st.checkbox("Converter endereços automaticamente", key=f"check_conv_{titulo_secao}")
+        converter = st.checkbox(
+            "Converter endereços automaticamente",
+            key=f"check_conv_{titulo_secao}",
+            disabled=ja_tem_coordenadas,
+            help="Marque para gerar Latitude e Longitude a partir do endereço quando a planilha ainda não tiver coordenadas.",
+        )
     with c5:
-        st.caption("Use essa opção só se a planilha ainda não tiver latitude e longitude.")
+        if ja_tem_coordenadas:
+            st.caption("A planilha já possui Latitude e Longitude. A conversão automática foi desativada.")
+        else:
+            st.caption("Use essa opção só se a planilha ainda não tiver latitude e longitude.")
     with c6:
         modo_mapa = st.selectbox("Tipo de mapa", ["Agrupado", "Pontos", "Calor"], key=f"modo_{titulo_secao}")
 
-    if converter:
+    if converter and not ja_tem_coordenadas:
         if st.button("Converter e preparar mapa", key=f"conv_{titulo_secao}"):
             try:
                 df_convertido = converter_enderecos(df_mapa, endereco_col, "Latitude", "Longitude")
                 st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
                 st.success("Conversão concluída. As colunas Latitude e Longitude foram preparadas.")
-                df_mapa = df_convertido
+                st.rerun()
             except Exception as e:
                 st.error(f"Erro na conversão de endereços: {e}")
+
+    if ja_tem_coordenadas and st.button("Reconverter endereços", key=f"reconv_{titulo_secao}"):
+        try:
+            base_sem_geo = df.copy()
+            df_convertido = converter_enderecos(base_sem_geo, endereco_col, "Latitude", "Longitude")
+            st.session_state[f"df_mapa_{titulo_secao}"] = df_convertido
+            st.success("Conversão refeita com sucesso.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro na reconversão de endereços: {e}")
 
     df_mapa = st.session_state.get(f"df_mapa_{titulo_secao}", df_mapa)
 
