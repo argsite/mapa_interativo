@@ -287,18 +287,35 @@ def converter_enderecos(df, col_endereco, col_lat, col_lon):
     status = st.empty()
 
     total = len(faltantes)
+    sucessos, vazios = 0, 0
     for i, idx in enumerate(faltantes, start=1):
         endereco = enderecos.loc[idx]
         if not endereco:
+            vazios += 1
             continue
-        consulta = geocode(f"{endereco}, Brasil")
+
+        tentativas = [
+            f"{endereco}, Brasil",
+            endereco,
+        ]
+        consulta = None
+        for tentativa in tentativas:
+            try:
+                consulta = geocode(tentativa)
+            except Exception:
+                consulta = None
+            if consulta:
+                break
+
         if consulta:
             df.at[idx, col_lat] = consulta.latitude
             df.at[idx, col_lon] = consulta.longitude
+            sucessos += 1
+
         progresso.progress(i / total if total else 1)
         status.write(f"Geocodificando {i} de {total} endereços...")
 
-    status.write("Conversão de endereços concluída.")
+    status.write(f"Conversão concluída. {sucessos} endereços obtiveram coordenadas e {vazios} estavam vazios.")
     return df
 
 
@@ -406,6 +423,10 @@ def render_mapa(df, titulo_secao):
 
     dados_prontos = st.session_state.get(f"dados_mapa_{titulo_secao}")
     config_pronta = st.session_state.get(f"config_mapa_{titulo_secao}")
+    resumo_geo = st.session_state.get(f"resumo_geo_{titulo_secao}")
+    if resumo_geo is not None:
+        st.info(f"Base: {resumo_geo['total_base']} registros | com coordenadas: {resumo_geo['com_coord']} | sem coordenadas válidas: {resumo_geo['sem_coord']} | exibidos no mapa: {resumo_geo['no_mapa']}")
+
     if dados_prontos is not None and config_pronta is not None and not dados_prontos.empty:
         st.success(f"Mapa preparado com {len(dados_prontos)} registros geocodificados.")
         st.caption("Visualização atualizada automaticamente após a conversão dos endereços.")
@@ -452,6 +473,18 @@ def render_mapa(df, titulo_secao):
                 dados[lon_col] = pd.to_numeric(dados[lon_col], errors="coerce")
                 dados = dados.dropna(subset=[lat_col, lon_col])
                 st.session_state[f"dados_mapa_{titulo_secao}"] = dados
+                st.session_state[f"resumo_geo_{titulo_secao}"] = {
+                    "total_base": len(df_convertido),
+                    "com_coord": int(df_convertido[lat_col].notna().sum() if lat_col in df_convertido.columns else 0),
+                    "sem_coord": int(((df_convertido[lat_col].isna()) | (df_convertido[lon_col].isna())).sum()),
+                    "no_mapa": len(dados),
+                }
+                st.session_state[f"resumo_geo_{titulo_secao}"] = {
+                    "total_base": len(df_convertido),
+                    "com_coord": int(df_convertido[lat_col].notna().sum() if lat_col in df_convertido.columns else 0),
+                    "sem_coord": int(((df_convertido[lat_col].isna()) | (df_convertido[lon_col].isna())).sum()),
+                    "no_mapa": len(dados),
+                }
                 st.session_state[f"config_mapa_{titulo_secao}"] = {
                     "lat_col": lat_col,
                     "lon_col": lon_col,
@@ -636,13 +669,18 @@ def render_diabetes(df):
     total = len(filtrado)
     pct = lambda col: f"{((filtrado[col] == 'S').mean() * 100 if total else 0):.1f}%"
     pct_visita = f"{(((filtrado['Visitas Normalizadas'] > 0).mean() * 100) if total else 0):.1f}%"
+    pacientes_com_pendencias = int((filtrado[["Sem consulta", "Sem PA", "Sem HbA1c", "Sem avaliação dos pés", "Não acompanhado", "Sem visita", "Cadastro desatualizado"]].any(axis=1)).sum()) if total else 0
+    prioridade_alta = int((filtrado["Prioridade"] == "Alta").sum()) if total else 0
+    sem_hba1c = int(filtrado["Sem HbA1c"].sum()) if total else 0
     exibir_metricas([
         ("Total", total),
+        ("Pacientes com pendências", pacientes_com_pendencias),
+        ("Prioridade alta", prioridade_alta),
         ("Consulta", pct(m["consulta"])),
         ("PA", pct(m["pa"])),
         ("HbA1c", pct(m["hba1c"])),
+        ("Sem HbA1c", sem_hba1c),
         ("Pés", pct(m["pes"])),
-        ("Acompanhados", pct(m["acomp"])),
         ("Com visita", pct_visita),
     ])
     c1, c2 = st.columns(2)
@@ -685,13 +723,16 @@ def render_hipertensao(df):
     total = len(filtrado)
     pct = lambda col: f"{((filtrado[col] == 'S').mean() * 100 if total else 0):.1f}%"
     pct_visita = f"{(((filtrado['Visitas Normalizadas'] > 0).mean() * 100) if total else 0):.1f}%"
+    pacientes_com_pendencias = int((filtrado[["Sem consulta", "Sem PA", "Não acompanhado", "Cadastro desatualizado", "Sem visita"]].any(axis=1)).sum()) if total else 0
+    prioridade_alta = int((filtrado["Prioridade"] == "Alta").sum()) if total else 0
     exibir_metricas([
         ("Total", total),
+        ("Pacientes com pendências", pacientes_com_pendencias),
+        ("Prioridade alta", prioridade_alta),
         ("Consulta", pct(m["consulta"])),
         ("PA aferida", pct(m["pa"])),
         ("Com visita", pct_visita),
         ("Cadastro atualizado", pct(m["cadastro"])),
-        ("Acompanhados", pct(m["acomp"])),
     ])
     c1, c2 = st.columns(2)
     with c1:
