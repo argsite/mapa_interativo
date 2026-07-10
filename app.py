@@ -89,6 +89,50 @@ def normalizar_visitas(serie):
     return pd.to_numeric(s, errors="coerce").fillna(0)
 
 
+def montar_motivo_busca_ativa(row, linha_cuidado):
+    motivos = []
+    if bool(row.get("Sem consulta", False)):
+        motivos.append("Sem consulta")
+    if bool(row.get("Sem PA", False)):
+        motivos.append("Sem PA")
+    if linha_cuidado == "Diabetes" and bool(row.get("Sem HbA1c", False)):
+        motivos.append("Sem HbA1c")
+    if linha_cuidado == "Diabetes" and bool(row.get("Sem avaliação dos pés", False)):
+        motivos.append("Sem avaliação dos pés")
+    if bool(row.get("Sem visita", False)):
+        motivos.append("Sem visita")
+    if bool(row.get("Não acompanhado", False)):
+        motivos.append("Não acompanhado")
+    if bool(row.get("Cadastro desatualizado", False)):
+        motivos.append("Cadastro desatualizado")
+    return " + ".join(motivos) if motivos else "Sem pendências críticas"
+
+
+def sugerir_acao(row, linha_cuidado):
+    if bool(row.get("Sem visita", False)) and bool(row.get("Não acompanhado", False)):
+        return "Realizar visita domiciliar e articular acompanhamento da equipe"
+    if bool(row.get("Sem consulta", False)) and bool(row.get("Sem PA", False)):
+        return "Priorizar avaliação clínica e verificação de PA"
+    if linha_cuidado == "Diabetes" and (bool(row.get("Sem HbA1c", False)) or bool(row.get("Sem avaliação dos pés", False))):
+        return "Programar cuidado do diabetes e atualizar exames/avaliações"
+    if bool(row.get("Cadastro desatualizado", False)):
+        return "Atualizar cadastro no próximo contato"
+    if bool(row.get("Não acompanhado", False)):
+        return "Reinserir no acompanhamento da equipe"
+    return "Manter monitoramento de rotina"
+
+
+def preparar_lista_nominal_inteligente(df, linha_cuidado, m):
+    lista = df.copy()
+    lista["Motivo da busca ativa"] = lista.apply(lambda row: montar_motivo_busca_ativa(row, linha_cuidado), axis=1)
+    lista["Ação sugerida"] = lista.apply(lambda row: sugerir_acao(row, linha_cuidado), axis=1)
+    ordenar = [c for c in ["Pontuação Prioridade", m.get("micro"), m.get("nome")] if c in lista.columns]
+    asc = [False, True, True][:len(ordenar)]
+    if ordenar:
+        lista = lista.sort_values(by=ordenar, ascending=asc)
+    return lista
+
+
 def construir_mapa(dados, lat_col, lon_col, nome_col, endereco_col, area_col, modo_mapa="Agrupado"):
     centro = [dados[lat_col].mean(), dados[lon_col].mean()]
     mapa = folium.Map(location=centro, zoom_start=13)
@@ -368,8 +412,12 @@ def render_diabetes(df):
         })
         grafico_barras(pend, "Indicador", "Quantidade", "Pendências do cuidado - Diabetes")
     st.subheader("Lista nominal para busca ativa")
-    cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], m["consulta"], m["pa"], m["hba1c"], m["pes"], m["visitas"], m["acomp"], "Prioridade"]
-    st.dataframe(filtrado[[c for c in cols if c in filtrado.columns]], use_container_width=True)
+    lista_inteligente = preparar_lista_nominal_inteligente(filtrado, "Diabetes", m)
+    somente_criticos = st.checkbox("Mostrar apenas casos com pendências", value=False, key="criticos_diabetes")
+    if somente_criticos:
+        lista_inteligente = lista_inteligente[lista_inteligente["Pontuação Prioridade"] > 0]
+    cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], "Prioridade", "Pontuação Prioridade", "Motivo da busca ativa", "Ação sugerida", m["consulta"], m["pa"], m["hba1c"], m["pes"], m["visitas"], m["acomp"]]
+    st.dataframe(lista_inteligente[[c for c in cols if c in lista_inteligente.columns]], use_container_width=True)
     render_mapa(filtrado, "Diabetes")
 
 
@@ -405,8 +453,12 @@ def render_hipertensao(df):
         })
         grafico_barras(pend, "Indicador", "Quantidade", "Pendências do cuidado - Hipertensão")
     st.subheader("Lista nominal para busca ativa")
-    cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], m["consulta"], m["pa"], m["visitas"], m["acomp"], "Prioridade"]
-    st.dataframe(filtrado[[c for c in cols if c in filtrado.columns]], use_container_width=True)
+    lista_inteligente = preparar_lista_nominal_inteligente(filtrado, "Hipertensão", m)
+    somente_criticos = st.checkbox("Mostrar apenas casos com pendências", value=False, key="criticos_hipertensao")
+    if somente_criticos:
+        lista_inteligente = lista_inteligente[lista_inteligente["Pontuação Prioridade"] > 0]
+    cols = [m["nome"], m["idade"], m["endereco"], m["equipe"], m["micro"], "Prioridade", "Pontuação Prioridade", "Motivo da busca ativa", "Ação sugerida", m["consulta"], m["pa"], m["visitas"], m["acomp"]]
+    st.dataframe(lista_inteligente[[c for c in cols if c in lista_inteligente.columns]], use_container_width=True)
     render_mapa(filtrado, "Hipertensão")
 
 
