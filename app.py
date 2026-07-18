@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Saúde 360 APS", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Saúde 360 APS teste", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 
 def strip_accents(text: str) -> str:
