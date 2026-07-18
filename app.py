@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Saúde 360 APS", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Saúde 360 APS teste 3", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 
 def strip_accents(text: str) -> str:
@@ -180,6 +180,10 @@ def preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
         "logradouro": "endereco",
         "endereco_paciente": "endereco",
         "localizacao": "endereco",
+        # Relatórios de hipertensão/idosa/gestante usam o nome por extenso da
+        # aferição de PA, enquanto o de diabetes usa a sigla — unificamos aqui
+        # para que todo o resto do código só precise checar "afericao_de_pa".
+        "afericao_de_pressao_arterial": "afericao_de_pa",
     }
     for old, new in alias_map.items():
         if old in df.columns and new not in df.columns:
@@ -230,6 +234,9 @@ def apply_report_mapping(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
             df["retina_ok"] = False
 
     if indicator_code == "C5":
+        # Nota: o relatório real de hipertensão usa "Aferição de pressão arterial"
+        # (não "Aferição de PA" como no de diabetes) — já normalizado para
+        # "afericao_de_pa" pelo alias_map em preprocess_df.
         if "consulta_medica_enfermagem" in df.columns:
             df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem"])
         if "afericao_de_pa" in df.columns:
@@ -246,10 +253,86 @@ def apply_report_mapping(df: pd.DataFrame, indicator_code: str) -> pd.DataFrame:
             df["antropometria_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
         if "qtd_visitas_domiciliares" in df.columns:
             df["visitas_ok"] = count_to_bool(df["qtd_visitas_domiciliares"])
-        if "vacinacao_influenza" in df.columns:
+        # Coluna real do relatório é "Vacina influenza" -> "vacina_influenza"
+        # (o nome antigo "vacinacao_influenza" nunca existiu nos dados reais).
+        if "vacina_influenza" in df.columns:
+            df["influenza_ok"] = to_bool(df["vacina_influenza"])
+        elif "vacinacao_influenza" in df.columns:
             df["influenza_ok"] = to_bool(df["vacinacao_influenza"])
-        elif "influenza" not in df.columns:
-            df["influenza_ok"] = False
+
+    if indicator_code == "C2":
+        if "nr_consultas" in df.columns:
+            df["consulta_ok"] = count_to_bool(df["nr_consultas"])
+        elif "consulta_medica_enfermagem_1o_mes" in df.columns:
+            df["consulta_ok"] = to_bool(df["consulta_medica_enfermagem_1o_mes"])
+        if "esquema_vacinal_completo" in df.columns:
+            df["vacina_ok"] = to_bool(df["esquema_vacinal_completo"])
+        if "qtd_registros_de_peso_altura" in df.columns:
+            df["peso_altura_ok"] = count_to_bool(df["qtd_registros_de_peso_altura"])
+        if "visita_domiciliar_1o_mes" in df.columns and "visita_domiciliar_6o_mes" in df.columns:
+            # Exige as duas visitas (1º e 6º mês) para considerar a prática cumprida.
+            df["visita_ok"] = to_bool(df["visita_domiciliar_1o_mes"]) & to_bool(df["visita_domiciliar_6o_mes"])
+        # "desenvolvimento_ok" (avaliação do desenvolvimento neuropsicomotor) não
+        # existe como coluna própria no relatório padrão de Desenvolvimento Infantil.
+        # Fica como pendência por padrão até que o sistema exporte essa informação
+        # separadamente (ou até você indicar outra coluna equivalente).
+        if "desenvolvimento_ok" not in df.columns:
+            df["desenvolvimento_ok"] = False
+
+    if indicator_code == "C3":
+        if "consulta_de_pre_natal_ate_12_semanas" in df.columns:
+            df["pre_natal_12s_ok"] = to_bool(df["consulta_de_pre_natal_ate_12_semanas"])
+        if "consulta_medica_enfermagem_gestacao" in df.columns:
+            df["consultas_gest_ok"] = to_bool(df["consulta_medica_enfermagem_gestacao"])
+        if "afericao_de_pa" in df.columns:
+            df["pa_ok"] = to_bool(df["afericao_de_pa"])
+        if "registro_de_peso_altura" in df.columns:
+            df["antropometria_ok"] = to_bool(df["registro_de_peso_altura"])
+        if "visitas_domiciliares_acs_tacs_gestacao" in df.columns:
+            df["visitas_gest_ok"] = count_to_bool(df["visitas_domiciliares_acs_tacs_gestacao"])
+        if "vacina_dtpa" in df.columns:
+            df["dtpa_ok"] = to_bool(df["vacina_dtpa"])
+
+        tri1_cols = [c for c in [
+            "teste_rapido_sifilis_primeiro_trimestre",
+            "teste_rapido_hiv_primeiro_trimestre",
+            "teste_rapido_hepatite_b_primeiro_trimestre",
+            "teste_rapido_hepatite_c_primeiro_trimestre",
+        ] if c in df.columns]
+        if tri1_cols:
+            df["tri1_ok"] = np.all([to_bool(df[c]) for c in tri1_cols], axis=0)
+
+        tri3_cols = [c for c in [
+            "teste_rapido_sifilis_terceiro_trimestre",
+            "teste_rapido_hiv_terceiro_trimestre",
+        ] if c in df.columns]
+        if tri3_cols:
+            df["tri3_ok"] = np.all([to_bool(df[c]) for c in tri3_cols], axis=0)
+
+        if "consulta_medica_enfermagem_puerperio" in df.columns:
+            df["puerperio_consulta_ok"] = to_bool(df["consulta_medica_enfermagem_puerperio"])
+        if "visitas_domiciliares_acs_tacs_puerperio" in df.columns:
+            df["puerperio_visita_ok"] = to_bool(df["visitas_domiciliares_acs_tacs_puerperio"])
+        if "avaliacao_odontologica_gestacao" in df.columns:
+            df["odonto_ok"] = to_bool(df["avaliacao_odontologica_gestacao"])
+
+    if indicator_code == "C7":
+        if "rast_cancer_do_colo_do_utero" in df.columns:
+            df["colo_utero_ok"] = to_bool(df["rast_cancer_do_colo_do_utero"])
+        if "vacina_hpv_entre_9_e_14_anos" in df.columns:
+            df["hpv_ok"] = to_bool(df["vacina_hpv_entre_9_e_14_anos"])
+        if "atend_saude_reprodutiva" in df.columns:
+            df["saude_reprodutiva_ok"] = to_bool(df["atend_saude_reprodutiva"])
+        if "rast_cancer_de_mama" in df.columns:
+            df["mama_ok"] = to_bool(df["rast_cancer_de_mama"])
+        # O relatório não traz colunas de elegibilidade explícitas; aplicamos as
+        # mesmas faixas etárias usadas no gerador de demonstração (regras do Saúde 360).
+        if "idade" in df.columns:
+            idade = pd.to_numeric(df["idade"], errors="coerce")
+            df["colo_utero_aplicavel"] = idade.between(25, 64)
+            df["hpv_aplicavel"] = idade.between(9, 14)
+            df["saude_reprodutiva_aplicavel"] = idade.between(25, 64)
+            df["mama_aplicavel"] = idade.between(50, 69)
 
     return df
 
@@ -258,8 +341,16 @@ def detect_indicator_by_columns(df: pd.DataFrame) -> Optional[str]:
     cols = set(df.columns)
     if {"hemoglobina_glicada", "avaliacao_dos_pes"}.issubset(cols):
         return "C4"
+    if {"vacina_influenza"}.issubset(cols):
+        return "C6"
     if {"afericao_de_pa", "qtd_registros_de_peso_altura"}.issubset(cols):
         return "C5"
+    if {"visita_domiciliar_1o_mes", "vacina_pentavalente"}.issubset(cols):
+        return "C2"
+    if {"consulta_de_pre_natal_ate_12_semanas", "vacina_dtpa"}.issubset(cols):
+        return "C3"
+    if {"rast_cancer_do_colo_do_utero", "rast_cancer_de_mama"}.issubset(cols):
+        return "C7"
     return None
 
 
@@ -361,12 +452,30 @@ def render_summary(df: pd.DataFrame, spec: IndicatorSpec):
 
 def main():
     st.title("Saúde 360 APS")
-    st.caption("Versão revisada com parser ajustado para relatórios reais de diabetes e hipertensão.")
+    st.caption(
+        "Painel com parser ajustado para os relatórios reais de: Mais Acesso (C1)*, "
+        "Desenvolvimento Infantil (C2), Gestante/Puerpério (C3), Diabetes (C4), "
+        "Hipertensão (C5), Pessoa Idosa (C6) e Prevenção do Câncer da Mulher (C7). "
+        "*C1 ainda sem relatório de exemplo — ver aviso ao selecioná-lo."
+    )
 
     with st.sidebar:
         indicador = st.selectbox("Indicador", list(INDICATORS.keys()), format_func=lambda x: f"{x} — {INDICATORS[x].name}")
         uploaded = st.file_uploader("Envie CSV/XLS/XLSX", type=["csv", "xls", "xlsx"])
         usar_demo = st.checkbox("Usar dados de demonstração", value=uploaded is None)
+
+    if indicador == "C1":
+        st.warning(
+            "O indicador C1 (Mais acesso na APS) ainda não tem um relatório de exemplo real "
+            "mapeado. Envie um relatório desse indicador para que eu possa ajustar o parser "
+            "com os nomes de coluna corretos."
+        )
+    if indicador == "C2":
+        st.info(
+            "No relatório de Desenvolvimento Infantil não há uma coluna específica de "
+            "'avaliação do desenvolvimento' — essa prática fica como pendência até você "
+            "confirmar se existe outra coluna equivalente no seu sistema."
+        )
 
     spec = INDICATORS[indicador]
 
