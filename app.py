@@ -4,6 +4,7 @@ import plotly.express as px
 import os
 
 # 1. CONFIGURAÇÃO CENTRALIZADA
+# Dica: Se o seu relatório tiver nomes de colunas diferentes, ajuste apenas aqui.
 CONFIG = {
     "Diabetes": {"pendencias": ["Sem HbA1c", "Sem avaliação dos pés"]},
     "Gestação": {"pendencias": ["Sem pré-natal", "Sem dTpa"]},
@@ -13,7 +14,7 @@ CONFIG = {
     "Câncer": {"pendencias": ["Sem Rast. Colo", "Sem Rast. Mama"]}
 }
 
-# 2. FUNÇÃO DE LEITURA RESILIENTE
+# 2. LEITURA RESILIENTE
 def carregar_dados(uploaded_file):
     ext = os.path.splitext(uploaded_file.name)[1].lower()
     try:
@@ -32,70 +33,72 @@ def carregar_dados(uploaded_file):
 
 # 3. NORMALIZAÇÃO E PRIORIZAÇÃO
 def processar_df(df, tipo):
+    # Renomeia colunas para o padrão interno (ajuste se seus arquivos tiverem nomes diferentes)
     mapeamento = {
         'Nome Completo': 'nome', 'CNS': 'cns', 
-        'Equipe Área': 'equipe', 'Acompanhado': 'status'
+        'Equipe Área': 'equipe', 'Microárea': 'micro',
+        'Idade': 'idade', 'Acompanhado': 'status'
     }
     df = df.rename(columns=mapeamento)
     
-    # Cria coluna de "Prioridade" (contagem de 'N' nas colunas configuradas)
+    # Preenche colunas obrigatórias caso não existam
+    for col in ['micro', 'idade', 'status']:
+        if col not in df.columns: df[col] = 'N/A'
+    
+    # Calcula 'Total Pendências' baseado na configuração
     cols_pend = CONFIG[tipo]["pendencias"]
     cols_existentes = [c for c in cols_pend if c in df.columns]
-    
-    if cols_existentes:
-        df['Total Pendências'] = df[cols_existentes].eq('N').sum(axis=1)
-    else:
-        df['Total Pendências'] = 0
+    df['Total Pendências'] = df[cols_existentes].eq('N').sum(axis=1) if cols_existentes else 0
     return df
 
 # 4. INTERFACE
 st.set_page_config(layout="wide", page_title="Dashboard Saúde 360")
 st.title("Dashboard APS - Saúde 360")
 
-tipo_selecionado = st.sidebar.selectbox("Selecione o Indicador", list(CONFIG.keys()))
+tipo_sel = st.sidebar.selectbox("Indicador em análise", list(CONFIG.keys()))
 uploaded_file = st.sidebar.file_uploader("Upload de Relatório", type=["csv", "xls", "xlsx"])
 
 if uploaded_file:
     df_raw = carregar_dados(uploaded_file)
     if df_raw is not None:
-        df = processar_df(df_raw, tipo_selecionado)
+        df_base = processar_df(df_raw, tipo_sel)
         
-        # --- FILTROS SIDEBAR COM SEGURANÇA ---
+        # --- FILTROS SIDEBAR ---
         st.sidebar.markdown("### 🔍 Filtros de Busca Ativa")
+        df_filtrado = df_base.copy()
         
-        if 'equipe' in df.columns:
-            equipes = sorted(df['equipe'].astype(str).unique())
-            equipes_sel = st.sidebar.multiselect("Filtrar por Equipe", equipes)
-            if equipes_sel: df = df[df['equipe'].isin(equipes_sel)]
+        if 'equipe' in df_filtrado.columns:
+            sel_eq = st.sidebar.multiselect("Equipe", sorted(df_base['equipe'].astype(str).unique()))
+            if sel_eq: df_filtrado = df_filtrado[df_filtrado['equipe'].isin(sel_eq)]
+        
+        if 'micro' in df_filtrado.columns:
+            sel_micro = st.sidebar.multiselect("Microárea", sorted(df_base['micro'].astype(str).unique()))
+            if sel_micro: df_filtrado = df_filtrado[df_filtrado['micro'].isin(sel_micro)]
             
-        pendencias_config = CONFIG[tipo_selecionado]["pendencias"]
-        pendencias_existentes = [p for p in pendencias_config if p in df.columns]
+        if 'idade' in df_filtrado.columns:
+            sel_idade = st.sidebar.multiselect("Faixa Etária", sorted(df_base['idade'].astype(str).unique()))
+            if sel_idade: df_filtrado = df_filtrado[df_filtrado['idade'].isin(sel_idade)]
+
+        pend_existentes = [p for p in CONFIG[tipo_sel]["pendencias"] if p in df_base.columns]
+        sel_pend = st.sidebar.multiselect("Pendências", pend_existentes)
+        if sel_pend:
+            df_filtrado = df_filtrado[df_filtrado[sel_pend].eq('N').any(axis=1)]
         
-        if pendencias_existentes:
-            pendencias_sel = st.sidebar.multiselect("Filtrar Pendências", pendencias_existentes)
-            if pendencias_sel:
-                df = df[df[pendencias_sel].eq('N').any(axis=1)]
-        
-        # --- DASHBOARD REATIVO ---
-        st.info(f"Visualizando {len(df)} pacientes após os filtros.")
-        
+        # --- PAINEL ---
+        # 1. Resumo macro (Base completa)
+        st.subheader("📊 Visão Geral (Base Completa)")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total de Pacientes", len(df))
-        c2.metric("Acompanhados", df[df['status'] == 'S'].shape[0] if 'status' in df.columns else 0)
-        c3.metric("Média de Pendências", f"{df['Total Pendências'].mean():.1f}")
+        c1.metric("Total de Pacientes", len(df_base))
+        c2.metric("Acompanhados", df_base[df_base['status'] == 'S'].shape[0])
+        c3.metric("Média de Pendências", f"{df_base['Total Pendências'].mean():.1f}")
         
-        tab1, tab2 = st.tabs(["📊 Painel de Desempenho", "📋 Lista Nominal"])
+        st.divider()
         
-        with tab1:
-            if 'equipe' in df.columns:
-                fig = px.bar(df['equipe'].value_counts().reset_index(), x='index', y='equipe', title="Distribuição por Equipe")
-                st.plotly_chart(fig, use_container_width=True)
-            
-        with tab2:
-            df_lista = df.sort_values(by='Total Pendências', ascending=False)
-            st.dataframe(df_lista, use_container_width=True)
-            
-            csv = df_lista.to_csv(index=False).encode('utf-8')
-            st.download_button("Baixar Lista de Busca Ativa", csv, "lista_busca_ativa.csv", "text/csv")
+        # 2. Busca Ativa (Filtrada)
+        st.subheader(f"📋 Lista de Busca Ativa ({len(df_filtrado)} pacientes)")
+        st.dataframe(df_filtrado.sort_values(by='Total Pendências', ascending=False), use_container_width=True)
+        
+        csv = df_filtrado.to_csv(index=False).encode('utf-8')
+        st.download_button("Baixar Lista Filtrada", csv, "busca_ativa.csv", "text/csv")
 else:
-    st.info("Aguardando o upload do arquivo.")
+    st.info("Por favor, faça o upload de um relatório para iniciar a análise.")
