@@ -15,18 +15,25 @@ CONFIG = {
 
 # 2. FUNÇÃO DE LEITURA RESILIENTE
 def carregar_dados(uploaded_file):
-    ext = os.path.splitext(uploaded_file.name)[1].lower()
+    """
+    Tenta ler o arquivo garantindo compatibilidade com formatos legados.
+    """
     try:
-        if ext in ['.xls', '.xlsx']:
-            return pd.read_excel(uploaded_file)
-        else:
-            for enc in ['latin-1', 'utf-8', 'cp1252']:
-                try:
-                    return pd.read_csv(uploaded_file, encoding=enc)
-                except: continue
-    except Exception as e:
-        st.error(f"Erro ao ler arquivo: {e}")
-        return None
+        # 1. Tenta ler como Excel (funciona para .xls e .xlsx)
+        # O pandas tenta detectar o formato automaticamente
+        return pd.read_excel(uploaded_file)
+    except:
+        # 2. Se falhar, tenta ler como CSV, testando encodings mais permissivos
+        # Adicionamos 'cp1252' e 'latin-1', que resolvem 99% dos casos de byte 0x87
+        for enc in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                uploaded_file.seek(0) # Volta ao início do arquivo para tentar de novo
+                return pd.read_csv(uploaded_file, encoding=enc, sep=None, engine='python')
+            except:
+                continue
+    
+    st.error("Não foi possível detectar o formato ou a codificação do arquivo. Tente salvar o arquivo como .xlsx no Excel e enviar novamente.")
+    return None
 
 # 3. NORMALIZAÇÃO E MAPEAMENTO
 def processar_df(df, tipo):
