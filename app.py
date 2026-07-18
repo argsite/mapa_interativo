@@ -446,6 +446,32 @@ def main():
 
     render_summary(processed, spec)
     render_charts(processed, spec)
+
+    # tabela e gráfico de cumprimento das boas práticas
+    if spec.type == "score" and spec.weights:
+        boas_praticas = []
+        for col, peso in spec.weights.items():
+            if col in processed.columns:
+                aplicaveis = processed.get("praticas_aplicaveis", processed[col].notna()).astype(int)
+                realizados = to_bool(processed[col]).sum()
+                nao_realizados = int(aplicaveis.sum() - realizados)
+                perc = round((realizados / aplicaveis.sum()) * 100, 1) if aplicaveis.sum() > 0 else 0.0
+                boas_praticas.append({
+                    "boa_pratica": col,
+                    "peso": peso,
+                    "realizados": int(realizados),
+                    "nao_realizados": nao_realizados,
+                    "percentual_realizados": perc,
+                })
+        if boas_praticas:
+            import pandas as _pd
+            bp_df = _pd.DataFrame(boas_praticas)
+            st.markdown("### Cumprimento das boas práticas")
+            c_bp1, c_bp2 = st.columns([2, 3])
+            c_bp1.dataframe(bp_df, hide_index=True, use_container_width=True)
+            fig_bp = px.bar(bp_df, x="boa_pratica", y="percentual_realizados", title="Percentual de boas práticas realizadas")
+            c_bp2.plotly_chart(fig_bp, use_container_width=True)
+
     st.markdown("---")
     render_table(processed, spec)
     csv_bytes = processed.to_csv(index=False).encode("utf-8-sig")
