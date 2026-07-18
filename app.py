@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.express as px
 import os
 
-# 1. CONFIGURAÇÃO CENTRALIZADA
+# 1. CONFIGURAÇÃO CENTRALIZADA (Adicione novos indicadores aqui)
+# pendencias: colunas que contêm 'N' ou 'Não' quando o paciente precisa de atenção
 CONFIG = {
     "Diabetes": {"colunas": ["HbA1c", "Pés"], "pendencias": ["Sem HbA1c", "Sem avaliação dos pés"]},
     "Gestação": {"colunas": ["Pré-natal", "dTpa"], "pendencias": ["Sem pré-natal", "Sem dTpa"]},
@@ -15,37 +16,38 @@ CONFIG = {
 
 # 2. FUNÇÃO DE LEITURA RESILIENTE
 def carregar_dados(uploaded_file):
-    """
-    Tenta ler o arquivo como Excel primeiro, e só depois como CSV.
-    Isso evita erros de codificação em arquivos binários.
-    """
-    # 1. Tenta ler como Excel (.xls ou .xlsx)
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
     try:
-        uploaded_file.seek(0) # Volta para o início do arquivo
-        return pd.read_excel(uploaded_file)
-    except:
-        # 2. Se falhar, tenta ler como CSV, ignorando erros de codificação
-        try:
-            uploaded_file.seek(0)
-            # O 'latin-1' lida bem com caracteres acentuados do Brasil
-            return pd.read_csv(uploaded_file, encoding='latin-1', sep=None, engine='python')
-        except Exception as e:
-            st.error(f"Não foi possível processar o arquivo. Detalhe: {e}")
-            return None
+        if ext in ['.xls', '.xlsx']:
+            return pd.read_excel(uploaded_file)
+        else:
+            for enc in ['latin-1', 'utf-8', 'cp1252']:
+                try:
+                    uploaded_file.seek(0)
+                    return pd.read_csv(uploaded_file, encoding=enc, sep=None, engine='python')
+                except: continue
+    except Exception as e:
+        st.error(f"Erro ao ler arquivo: {e}")
+        return None
 
-# 3. NORMALIZAÇÃO E MAPEAMENTO
+# 3. NORMALIZAÇÃO E PRIORIZAÇÃO
 def processar_df(df, tipo):
     mapeamento = {
         'Nome Completo': 'nome', 'CNS': 'cns', 
         'Equipe Área': 'equipe', 'Acompanhado': 'status'
     }
     df = df.rename(columns=mapeamento)
-    # Garante colunas de status e equipe
-    if 'status' not in df.columns: df['status'] = 'N'
-    if 'equipe' not in df.columns: df['equipe'] = 'Indefinida'
+    
+    # Cria coluna de "Prioridade" (contagem de pendências marcadas como 'N')
+    pendencias = CONFIG[tipo]["pendencias"]
+    if all(col in df.columns for col in pendencias):
+        df['Total Pendências'] = df[pendencias].eq('N').sum(axis=1)
+    else:
+        df['Total Pendências'] = 0
+        
     return df
 
-# 4. INTERFACE PRINCIPAL
+# 4. INTERFACE STREAMLIT
 st.set_page_config(layout="wide", page_title="Dashboard Saúde 360")
 st.title("Dashboard APS - Saúde 360")
 
@@ -53,32 +55,45 @@ tipo_selecionado = st.sidebar.selectbox("Selecione o Indicador", list(CONFIG.key
 uploaded_file = st.sidebar.file_uploader("Upload de Relatório", type=["csv", "xls", "xlsx"])
 
 if uploaded_file:
-    df = carregar_dados(uploaded_file)
-    if df is not None:
-        df = processar_df(df, tipo_selecionado)
+    df_raw = carregar_dados(uploaded_file)
+    if df_raw is not None:
+        df = processar_df(df_raw, tipo_selecionado)
         
-        # Dashboard - Métricas
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total de Pacientes", len(df))
-        col2.metric("Acompanhados", df[df['status'] == 'S'].shape[0])
-        col3.metric("Pendentes", df[df['status'] == 'N'].shape[0])
+        # --- FILTROS SIDEBAR ---
+        st.sidebar.markdown("### 🔍 Filtros de Busca Ativa")
         
-        st.divider()
+        # Filtro de Equipe
+        equipes = sorted(df['equipe'].unique().astype(str))
+        equipes_sel = st.sidebar.multiselect("Equipe", equipes)
+        if equipes_sel: df = df[df['equipe'].isin(equipes_sel)]
+            
+        # Filtro de Pendências
+        pendencias_sel = st.sidebar.multiselect("Pendências (Busca Ativa)", CONFIG[tipo_selecionado]["pendencias"])
+        if pendencias_sel:
+            df = df[df[pendencias_sel].eq('N').any(axis=1)]
         
-        # Visualização Modular
-        tab1, tab2 = st.tabs(["Painel Gerencial", "Lista Nominal / Busca Ativa"])
+        # --- DASHBOARD REATIVO ---
+        st.info(f"Visualizando {len(df)} pacientes após os filtros.")
+        
+        # Cards
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total de Pacientes", len(df))
+        c2.metric("Acompanhados", df[df['status'] == 'S'].shape[0])
+        c3.metric("Média de Pendências", f"{df['Total Pendências'].mean():.1f}")
+        
+        # Gráficos e Lista
+        tab1, tab2 = st.tabs(["📊 Painel de Desempenho", "📋 Lista Nominal"])
         
         with tab1:
             fig = px.bar(df['equipe'].value_counts().reset_index(), x='index', y='equipe', 
-                         title=f"Distribuição de {tipo_selecionado} por Equipe")
+                         title="Distribuição por Equipe")
             st.plotly_chart(fig, use_container_width=True)
             
         with tab2:
-            st.write("Filtre pacientes para busca ativa:")
-            status_filtro = st.multiselect("Filtrar status", df['status'].unique())
-            df_filtrado = df[df['status'].isin(status_filtro)] if status_filtro else df
-            st.dataframe(df_filtrado)
+            # Lista ordenada por prioridade (quem tem mais pendências primeiro)
+            df_lista = df.sort_values(by='Total Pendências', ascending=False)
+            st.dataframe(df_lista, use_container_width=True)
             
-            # Botão de exportação
-            csv = df_filtrado.to_csv(index=False).encode('utf-8')
-            st.download_button("Baixar Lista de Busca Ativa", csv, "busca_ativa.csv", "text/csv")
+            # Download
+            csv = df_lista.to_csv(index=False).encode('utf-8')
+            st.download_button("Baixar Lista de Busca Ativa", csv, "lista_busca_ativa.csv", "text/csv")
