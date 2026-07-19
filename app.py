@@ -721,15 +721,7 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
         bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
         use_container_width=True,
     )
-    fig = px.bar(
-        bp_df,
-        x="Boa prática",
-        y="% Realizado",
-        text="% Realizado",
-        title="Percentual de realização por boa prática",
-    )
-    fig.update_layout(xaxis_title="", yaxis_title="%")
-    st.plotly_chart(fig, use_container_width=True)
+    
 
 
 def export_excel_bytes(df: pd.DataFrame) -> bytes:
@@ -759,6 +751,19 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
         if total > 0:
             bp_df = build_good_practices_df(df_scored, spec)
             if not bp_df.empty:
+                            # Criar coluna só com a letra da boa prática (A, B, C, D, E)
+            bp_df = bp_df.copy()
+            bp_df["Letra"] = bp_df["Boa prática"].str.extract(r"^([A-Z])", expand=False).fillna("")
+
+            fig_bp = px.bar(
+                bp_df,
+                x="Letra",           # apenas A, B, C, D, E
+                y="% Realizado",
+                text="% Realizado",
+                title="Percentual de realização por boa prática (A–E)",
+            )
+            fig_bp.update_layout(xaxis_title="Boa prática", yaxis_title="%")
+            st.plotly_chart(fig_bp, use_container_width=True)
                 fig_bp = px.bar(
                     bp_df,
                     x="Boa prática",
@@ -925,39 +930,12 @@ def main():
     if pend_label:
         st.caption(f"Filtro de pendências aplicado: {pend_label}")
 
-    tab1, tab2, tab3 = st.tabs(["Painel", "Qualidade dos dados", "Prévia do arquivo"])
-
-    with tab1:
-        st.markdown(f"## {spec.code} - {spec.name}")
-        st.write(spec.description)
-        if spec.type == "score":
-            render_score_dashboard(df_filtered, spec)
-        else:
-            render_percentual_dashboard(df_filtered, spec)
-
-    with tab2:
-        st.markdown("## Qualidade dos dados")
-        quality = pd.DataFrame(
-            {
-                "coluna": df.columns,
-                "nulos": [int(df[c].isna().sum()) for c in df.columns],
-                "vazios": [
-                    int((df[c].astype(str).str.strip() == "").sum()) for c in df.columns
-                ],
-                "unicos": [int(df[c].nunique(dropna=True)) for c in df.columns],
-            }
-        )
-        st.dataframe(quality, use_container_width=True)
-        st.download_button(
-            "Baixar relatório de qualidade (CSV)",
-            data=quality.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"qualidade_{spec.code.lower()}.csv",
-            mime="text/csv",
-        )
-
-    with tab3:
-        st.markdown("## Prévia do arquivo importado")
-        st.dataframe(df.head(200), use_container_width=True, height=520)
+    st.markdown(f"## {spec.code} - {spec.name}")
+st.write(spec.description)
+if spec.type == "score":
+    render_score_dashboard(df_filtered, spec)
+else:
+    render_percentual_dashboard(df_filtered, spec)
 
 
 if __name__ == "__main__":
