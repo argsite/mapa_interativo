@@ -717,10 +717,19 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
         )
         return
 
+    # Cópia só para exibição, com símbolo de %
+    bp_df_display = bp_df.copy()
+    if "% Realizado" in bp_df_display.columns:
+        bp_df_display["% Realizado"] = bp_df_display["% Realizado"].map(
+            lambda v: f"{v:.1f}%" if pd.notna(v) else ""
+        )
+
     st.dataframe(
-        bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
+        bp_df_display[
+            ["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]
+        ],
         use_container_width=True,
-    )
+    )    
 
 
 def export_excel_bytes(df: pd.DataFrame) -> bytes:
@@ -751,14 +760,16 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
             bp_df = build_good_practices_df(df_scored, spec)
             if not bp_df.empty:
                 bp_df = bp_df.copy()
+                # extrai a letra inicial (A, B, C, D, E)
                 bp_df["Letra"] = (
                     bp_df["Boa prática"]
                     .str.extract(r"^([A-Z])", expand=False)
                     .fillna("")
                 )
+
                 fig_bp = px.bar(
                     bp_df,
-                    x="Letra",
+                    x="Letra",          # apenas A, B, C, D, E
                     y="% Realizado",
                     text="% Realizado",
                     title="Percentual de realização por boa prática (A–E)",
@@ -778,6 +789,7 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
         )
         st.plotly_chart(fig_class, use_container_width=True)
 
+    # Abaixo, tabela e lista nominal (layout original)
     render_good_practices(df_scored, spec)
     render_nominal(df_scored, spec)
 
@@ -888,8 +900,7 @@ def main():
 
     if uploaded_file is None:
         st.info(
-            "Envie um relatório para começar. O app tenta identificar o indicador automaticamente "
-            "pelo nome do arquivo e pelas colunas."
+            "Envie um relatório para começar. O app tenta identificar o indicador automaticamente pelo nome do arquivo e pelas colunas."
         )
         st.stop()
 
@@ -908,11 +919,9 @@ def main():
         if manual_indicator != "Automático"
         else detected
     )
-
     if selected_code is None:
         st.warning(
-            "Não foi possível identificar automaticamente o indicador. "
-            "Escolha manualmente na barra lateral."
+            "Não foi possível identificar automaticamente o indicador. Escolha manualmente na barra lateral."
         )
         st.stop()
 
@@ -926,11 +935,11 @@ def main():
         st.caption(f"Filtro de pendências aplicado: {pend_label}")
 
     st.markdown(f"## {spec.code} - {spec.name}")
-    st.write(spec.description)
-    if spec.type == "score":
-        render_score_dashboard(df_filtered, spec)
-    else:
-        render_percentual_dashboard(df_filtered, spec)
+st.write(spec.description)
+if spec.type == "score":
+    render_score_dashboard(df_filtered, spec)
+else:
+    render_percentual_dashboard(df_filtered, spec)
 
 
 if __name__ == "__main__":
