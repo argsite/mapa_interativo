@@ -20,6 +20,7 @@ st.set_page_config(
 # Utilidades
 # =========================
 
+
 def strip_accents(text: str) -> str:
     text = str(text)
     return "".join(
@@ -102,13 +103,19 @@ def map_first(df: pd.DataFrame, target: str, candidates: List[str], default=""):
 def infer_tipo_equipe_from_text(series: pd.Series) -> pd.Series:
     vals = series.astype(str).str.upper()
     out = np.where(vals.str.contains(" 76") | vals.str.contains("TIPO 76"), "76", "")
-    out = np.where((pd.Series(out, index=series.index) == "") & (vals.str.contains(" 70") | vals.str.contains("TIPO 70")), "70", out)
+    out = np.where(
+        (pd.Series(out, index=series.index) == "")
+        & (vals.str.contains(" 70") | vals.str.contains("TIPO 70")),
+        "70",
+        out,
+    )
     return pd.Series(out, index=series.index)
 
 
 # =========================
 # Especificações dos indicadores
 # =========================
+
 
 @dataclass
 class IndicatorSpec:
@@ -117,7 +124,9 @@ class IndicatorSpec:
     type: str  # score | percentual
     description: str
     weights: Dict[str, int] = field(default_factory=dict)
-    non_conditionals: Dict[str, Callable[[pd.DataFrame], pd.Series]] = field(default_factory=dict)
+    non_conditionals: Dict[str, Callable[[pd.DataFrame], pd.Series]] = field(
+        default_factory=dict
+    )
     numerator_col: Optional[str] = None
     denominator_col: Optional[str] = None
     entity_label: str = "pessoas"
@@ -170,7 +179,9 @@ BOA_PRATICA_LABELS = {
 
 
 def label_boa_pratica(indicator_code: str, col: str) -> str:
-    return BOA_PRATICA_LABELS.get(indicator_code, {}).get(col, col.replace("_", " ").capitalize())
+    return BOA_PRATICA_LABELS.get(indicator_code, {}).get(
+        col, col.replace("_", " ").capitalize()
+    )
 
 
 INDICATORS: Dict[str, IndicatorSpec] = {
@@ -189,11 +200,11 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Monitoramento da puericultura de crianças até 2 anos com base nas práticas A–E.",
         weights={
-            "c2_a_ok": 20,  # 1ª consulta até 30º dia
-            "c2_b_ok": 20,  # 9 consultas até 2 anos
-            "c2_c_ok": 20,  # 9 registros de peso/altura
-            "c2_d_ok": 20,  # visita domiciliar em tempo oportuno
-            "c2_e_ok": 20,  # esquema vacinal em dia
+            "c2_a_ok": 20,
+            "c2_b_ok": 20,
+            "c2_c_ok": 20,
+            "c2_d_ok": 20,
+            "c2_e_ok": 20,
         },
         entity_label="crianças acompanhadas",
     ),
@@ -203,10 +214,10 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Painel operacional local para gestantes e puérperas com base nas práticas A–D.",
         weights={
-            "c3_a_ok": 25,  # 1ª consulta até 12ª semana
-            "c3_b_ok": 25,  # mínimo de 6 consultas de pré-natal
-            "c3_c_ok": 25,  # exames laboratoriais obrigatórios realizados/avaliados
-            "c3_d_ok": 25,  # consulta de puerpério até 42º dia
+            "c3_a_ok": 25,
+            "c3_b_ok": 25,
+            "c3_c_ok": 25,
+            "c3_d_ok": 25,
         },
         entity_label="gestantes/puérperas",
     ),
@@ -216,14 +227,15 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Pontuação por pessoa com diabetes até 100 pontos a partir das práticas A–D.",
         weights={
-            "c4_a_ok": 25,  # consulta em 6 meses
-            "c4_b_ok": 25,  # PA em 6 meses
-            "c4_c_ok": 25,  # antropometria em 6 meses
-            "c4_d_ok": 25,  # 2 visitas domiciliares em 12 meses (motivo diabetes)
+            "c4_a_ok": 25,
+            "c4_b_ok": 25,
+            "c4_c_ok": 25,
+            "c4_d_ok": 25,
         },
         non_conditionals={
-            # visitas domiciliares só contam como boa prática para tipo 76 (ACS/TACS), se aplicável
-            "c4_d_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+            "c4_d_ok": lambda d: d["tipo_equipe"].astype(str).eq("76")
+            if "tipo_equipe" in d.columns
+            else pd.Series(False, index=d.index),
         },
         entity_label="pessoas com diabetes",
     ),
@@ -233,10 +245,10 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Pontuação por pessoa com hipertensão até 100 pontos a partir das práticas A–D.",
         weights={
-            "c5_a_ok": 25,  # consulta em 6 meses
-            "c5_b_ok": 25,  # PA em 6 meses
-            "c5_c_ok": 25,  # 2 visitas domiciliares em 12 meses
-            "c5_d_ok": 25,  # avaliação/atendimento em saúde bucal no quadrimestre
+            "c5_a_ok": 25,
+            "c5_b_ok": 25,
+            "c5_c_ok": 25,
+            "c5_d_ok": 25,
         },
         entity_label="pessoas com hipertensão",
     ),
@@ -252,7 +264,9 @@ INDICATORS: Dict[str, IndicatorSpec] = {
             "influenza_ok": 25,
         },
         non_conditionals={
-            "visitas_ok": lambda d: d["tipo_equipe"].astype(str).eq("76") if "tipo_equipe" in d.columns else pd.Series(False, index=d.index),
+            "visitas_ok": lambda d: d["tipo_equipe"].astype(str).eq("76")
+            if "tipo_equipe" in d.columns
+            else pd.Series(False, index=d.index),
         },
         entity_label="pessoas idosas",
     ),
@@ -262,19 +276,19 @@ INDICATORS: Dict[str, IndicatorSpec] = {
         type="score",
         description="Painel operacional local para prevenção do câncer da mulher com base nas práticas A–D.",
         weights={
-            "c7_a_ok": 25,  # citopatológico/HPV em prazos corretos
-            "c7_b_ok": 25,  # vacina HPV 9–14 anos
-            "c7_c_ok": 25,  # atendimento em saúde sexual e reprodutiva
-            "c7_d_ok": 25,  # mamografia 50–69 anos em 24 meses
+            "c7_a_ok": 25,
+            "c7_b_ok": 25,
+            "c7_c_ok": 25,
+            "c7_d_ok": 25,
         },
         entity_label="mulheres acompanhadas",
     ),
 }
 
-
 # =========================
 # Leitura e identificação
 # =========================
+
 
 def read_uploaded_file(uploaded_file) -> pd.DataFrame:
     suffix = uploaded_file.name.lower()
@@ -297,16 +311,28 @@ def detect_indicator_from_columns(df: pd.DataFrame, filename: str) -> Optional[s
 
     if {"hemoglobina_glicada", "avaliacao_dos_pes"}.issubset(cols) or "diabetes" in name:
         return "C4"
-    if "hipertensao" in name or {"afericao_de_pa", "qtd_registros_de_peso_altura"}.issubset(cols):
+    if "hipertensao" in name or {
+        "afericao_de_pa",
+        "qtd_registros_de_peso_altura",
+    }.issubset(cols):
         if "hemoglobina_glicada" not in cols and "avaliacao_dos_pes" not in cols:
             return "C5"
     if "idosa" in name or "idoso" in name or "vacina_influenza" in cols:
         return "C6"
     if "gestante" in name or "puerpera" in name or "gestacao" in name:
         return "C3"
-    if "desenvolvimento_infantil" in name or "infantil" in name or "crianca" in name:
+    if (
+        "desenvolvimento_infantil" in name
+        or "infantil" in name
+        or "crianca" in name
+    ):
         return "C2"
-    if "cancer" in name or "mulher" in name or "mamografia" in cols or "citopatologico" in cols:
+    if (
+        "cancer" in name
+        or "mulher" in name
+        or "mamografia" in cols
+        or "citopatologico" in cols
+    ):
         return "C7"
     if "acesso" in name:
         return "C1"
@@ -316,6 +342,7 @@ def detect_indicator_from_columns(df: pd.DataFrame, filename: str) -> Optional[s
 # =========================
 # Pré-processamento genérico
 # =========================
+
 
 def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.DataFrame:
     df = df.copy()
@@ -393,20 +420,32 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         df["influenza_ok"] = False
 
     # C1 - acesso local
-    df["cadastro_ok"] = to_bool(df["cadastro_atualizado"]) if "cadastro_atualizado" in df.columns else False
-    df["atendimento_ok"] = to_bool(df["acompanhado"]) if "acompanhado" in df.columns else df["consulta_ok"]
+    df["cadastro_ok"] = (
+        to_bool(df["cadastro_atualizado"]) if "cadastro_atualizado" in df.columns else False
+    )
+    df["atendimento_ok"] = (
+        to_bool(df["acompanhado"]) if "acompanhado" in df.columns else df["consulta_ok"]
+    )
     df["numerador_c1"] = (df["cadastro_ok"] | df["atendimento_ok"]).astype(int)
     df["denominador_c1"] = 1
 
-    # C2 - desenvolvimento infantil (ajustes operacionais simples)
+    # C2 - desenvolvimento infantil (ajustes simples)
     if indicator_code == "C2" or (indicator_code is None and df["idade"].notna().any()):
-        df["vacina_ok"] = to_bool(df["vacina_influenza"]) if "vacina_influenza" in df.columns else df.get("vacina_ok", False)
+        df["vacina_ok"] = (
+            to_bool(df["vacina_influenza"])
+            if "vacina_influenza" in df.columns
+            else df.get("vacina_ok", False)
+        )
         if "acompanhado" in df.columns:
             df["vacina_ok"] = df["vacina_ok"] | to_bool(df["acompanhado"])
 
     # C3 - gestação/puerpério (exame_ok genérico)
     df["exame_ok"] = False
-    possible_exam_cols = [c for c in df.columns if any(k in c for k in ["exame", "teste", "hemoglobina", "citopatologico", "mamografia"])]
+    possible_exam_cols = [
+        c
+        for c in df.columns
+        if any(k in c for k in ["exame", "teste", "hemoglobina", "citopatologico", "mamografia"])
+    ]
     if possible_exam_cols:
         temp = pd.Series(False, index=df.index)
         for c in possible_exam_cols:
@@ -421,11 +460,13 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     elif "acompanhado" in df.columns and indicator_code == "C7":
         df["citopatologico_ok"] = to_bool(df["acompanhado"])
 
+    if "mamografia" in df.columns:
+        df["mamografia_ok"] = to_bool(df["mamografia"])
+
     # Flags específicas A–E por indicador (operacional local)
-    # C2 - Desenvolvimento infantil (relatório infantil)
+
+    # C2 - Desenvolvimento infantil
     if indicator_code == "C2":
-        # Exemplo: colunas de contagem/flags no relatório infantil.
-        # Ajuste os nomes conforme seu arquivo real.
         if "qtd_consultas" in df.columns:
             df["c2_b_ok"] = parse_count(df["qtd_consultas"]).fillna(0).ge(9)
         if "qtd_registros_de_peso_altura" in df.columns:
@@ -434,7 +475,6 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
             df["c2_d_ok"] = to_bool(df["visita_oportuna"])
         if "vacina_em_dia" in df.columns:
             df["c2_e_ok"] = to_bool(df["vacina_em_dia"])
-        # A - 1ª consulta até 30º dia
         if "consulta_ate_30_dias" in df.columns:
             df["c2_a_ok"] = to_bool(df["consulta_ate_30_dias"])
 
@@ -451,16 +491,20 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 
     # C4 - Diabetes
     if indicator_code == "C4":
-        # A - consulta em 6 meses
-        df["c4_a_ok"] = to_bool(df["consulta_medica_enfermagem"]) if "consulta_medica_enfermagem" in df.columns else df.get("consulta_ok", False)
-        # B - PA em 6 meses
-        df["c4_b_ok"] = to_bool(df["afericao_de_pa"]) if "afericao_de_pa" in df.columns else df.get("pa_ok", False)
-        # C - antropometria em 6 meses
+        df["c4_a_ok"] = (
+            to_bool(df["consulta_medica_enfermagem"])
+            if "consulta_medica_enfermagem" in df.columns
+            else df.get("consulta_ok", False)
+        )
+        df["c4_b_ok"] = (
+            to_bool(df["afericao_de_pa"])
+            if "afericao_de_pa" in df.columns
+            else df.get("pa_ok", False)
+        )
         if "qtd_registros_de_peso_altura" in df.columns:
             df["c4_c_ok"] = parse_count(df["qtd_registros_de_peso_altura"]).fillna(0).ge(1)
         else:
             df["c4_c_ok"] = df.get("antropometria_ok", False)
-        # D - 2 visitas domiciliares em 12 meses (motivo diabetes)
         if "qtd_visitas_domiciliares" in df.columns:
             df["c4_d_ok"] = parse_count(df["qtd_visitas_domiciliares"]).fillna(0).ge(2)
         else:
@@ -468,16 +512,20 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 
     # C5 - Hipertensão
     if indicator_code == "C5":
-        # A - consulta em 6 meses
-        df["c5_a_ok"] = to_bool(df["consulta_medica_enfermagem"]) if "consulta_medica_enfermagem" in df.columns else df.get("consulta_ok", False)
-        # B - PA em 6 meses
-        df["c5_b_ok"] = to_bool(df["afericao_de_pressao_arterial"]) if "afericao_de_pressao_arterial" in df.columns else df.get("pa_ok", False)
-        # C - 2 visitas domiciliares em 12 meses
+        df["c5_a_ok"] = (
+            to_bool(df["consulta_medica_enfermagem"])
+            if "consulta_medica_enfermagem" in df.columns
+            else df.get("consulta_ok", False)
+        )
+        df["c5_b_ok"] = (
+            to_bool(df["afericao_de_pressao_arterial"])
+            if "afericao_de_pressao_arterial" in df.columns
+            else df.get("pa_ok", False)
+        )
         if "qtd_visitas_domiciliares" in df.columns:
             df["c5_c_ok"] = parse_count(df["qtd_visitas_domiciliares"]).fillna(0).ge(2)
         else:
             df["c5_c_ok"] = df.get("visita_ok", False)
-        # D - saúde bucal no quadrimestre (ajuste conforme coluna real)
         if "saude_bucal_ok" in df.columns:
             df["c5_d_ok"] = to_bool(df["saude_bucal_ok"])
 
@@ -500,6 +548,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 # =========================
 # Cálculos
 # =========================
+
 
 def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     df = df.copy()
@@ -526,10 +575,20 @@ def calculate_score_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataF
     return df
 
 
-def calculate_percentual_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.DataFrame, float]:
+def calculate_percentual_indicator(
+    df: pd.DataFrame, spec: IndicatorSpec
+) -> Tuple[pd.DataFrame, float]:
     df = df.copy()
-    num = pd.to_numeric(df[spec.numerator_col], errors="coerce").fillna(0) if spec.numerator_col else pd.Series(0, index=df.index)
-    den = pd.to_numeric(df[spec.denominator_col], errors="coerce").fillna(0) if spec.denominator_col else pd.Series(0, index=df.index)
+    num = (
+        pd.to_numeric(df[spec.numerator_col], errors="coerce").fillna(0)
+        if spec.numerator_col
+        else pd.Series(0, index=df.index)
+    )
+    den = (
+        pd.to_numeric(df[spec.denominator_col], errors="coerce").fillna(0)
+        if spec.denominator_col
+        else pd.Series(0, index=df.index)
+    )
     df["numerador"] = num
     df["denominador"] = den
     total_num = num.sum()
@@ -554,15 +613,19 @@ def build_good_practices_df(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFra
         total_aplicavel = int(aplicavel.sum())
         realizados = int((aplicavel & to_bool(df[col])).sum())
         nao_realizados = max(total_aplicavel - realizados, 0)
-        perc = round((realizados / total_aplicavel) * 100, 1) if total_aplicavel else 0.0
-        rows.append({
-            "Boa prática": label_boa_pratica(spec.code, col),
-            "coluna": col,
-            "Peso": peso,
-            "Realizados": realizados,
-            "% Realizado": perc,
-            "Não realizado": nao_realizados,
-        })
+        perc = round(
+            (realizados / total_aplicavel) * 100, 1
+        ) if total_aplicavel else 0.0
+        rows.append(
+            {
+                "Boa prática": label_boa_pratica(spec.code, col),
+                "coluna": col,
+                "Peso": peso,
+                "Realizados": realizados,
+                "% Realizado": perc,
+                "Não realizado": nao_realizados,
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -570,18 +633,44 @@ def build_good_practices_df(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFra
 # Filtros globais
 # =========================
 
-def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.DataFrame, Optional[str]]:
+
+def apply_global_filters(
+    df: pd.DataFrame, spec: IndicatorSpec
+) -> Tuple[pd.DataFrame, Optional[str]]:
     with st.sidebar:
         st.header("Filtros do painel")
-        equipes = sorted([str(e) for e in df.get("equipe", pd.Series(dtype=str)).dropna().unique() if str(e).strip()])
-        microareas = sorted([str(m) for m in df.get("micro_area", pd.Series(dtype=str)).dropna().unique() if str(m).strip()])
-        faixas = sorted([str(f) for f in df.get("faixa_etaria", pd.Series(dtype=str)).dropna().unique() if str(f).strip()])
+        equipes = sorted(
+            [
+                str(e)
+                for e in df.get("equipe", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                if str(e).strip()
+            ]
+        )
+        microareas = sorted(
+            [
+                str(m)
+                for m in df.get("micro_area", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                if str(m).strip()
+            ]
+        )
+        faixas = sorted(
+            [
+                str(f)
+                for f in df.get("faixa_etaria", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                if str(f).strip()
+            ]
+        )
 
         eq_sel = st.multiselect("Por equipe", equipes)
         ma_sel = st.multiselect("Por microárea", microareas)
         fx_sel = st.multiselect("Por faixa etária", faixas)
 
-        # Pendências com rótulos amigáveis
         bp_df_full = build_good_practices_df(df, spec)
         pend_options = ["Todos"]
         label_to_col: Dict[str, str] = {}
@@ -608,7 +697,7 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
     elif pend_sel != "Todos" and pend_sel in label_to_col:
         col = label_to_col[pend_sel]
         if col in out.columns:
-            out = out[~to_bool(out[col])]  # pacientes com a boa prática não realizada
+            out = out[~to_bool(out[col])]
 
     selected_label = pend_sel if pend_sel != "Todos" else None
     return out, selected_label
@@ -618,14 +707,20 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
 # Renderização
 # =========================
 
+
 def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     bp_df = build_good_practices_df(df, spec)
     st.markdown("### Cumprimento das boas práticas")
     if bp_df.empty:
-        st.info("Não foi possível identificar boas práticas estruturadas para este relatório.")
+        st.info(
+            "Não foi possível identificar boas práticas estruturadas para este relatório."
+        )
         return
 
-    st.dataframe(bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]], use_container_width=True)
+    st.dataframe(
+        bp_df[["Boa prática", "Peso", "Realizados", "% Realizado", "Não realizado"]],
+        use_container_width=True,
+    )
     fig = px.bar(
         bp_df,
         x="Boa prática",
@@ -658,45 +753,41 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     c3.metric("Desempenho", desempenho)
 
     colg1, colg2 = st.columns(2)
-with colg1:
-    if total > 0:
-        bp_df = build_good_practices_df(df_scored, spec)
-        if not bp_df.empty:
-            fig_bp = px.bar(
-                bp_df,
-                x="Boa prática",
-                y="% Realizado",
-                text="% Realizado",
-                title="Percentual de realização por boa prática",
-            )
-            fig_bp.update_layout(xaxis_title="", yaxis_title="%")
-            st.plotly_chart(fig_bp, use_container_width=True)
+
+    # Coluna esquerda: gráfico por boas práticas A–E
+    with colg1:
+        if total > 0:
+            bp_df = build_good_practices_df(df_scored, spec)
+            if not bp_df.empty:
+                fig_bp = px.bar(
+                    bp_df,
+                    x="Boa prática",
+                    y="% Realizado",
+                    text="% Realizado",
+                    title="Percentual de realização por boa prática (A–E)",
+                )
+                fig_bp.update_layout(xaxis_title="", yaxis_title="%")
+                st.plotly_chart(fig_bp, use_container_width=True)
+
+    # Coluna direita: pizza de classificação
     with colg2:
         class_df = df_scored["classificacao"].value_counts().reset_index()
         class_df.columns = ["Classificação", "Quantidade"]
-        fig_class = px.pie(class_df, names="Classificação", values="Quantidade", title="Distribuição dos pacientes por faixa de desempenho")
+        fig_class = px.pie(
+            class_df,
+            names="Classificação",
+            values="Quantidade",
+            title="Distribuição dos pacientes por faixa de desempenho",
+        )
         st.plotly_chart(fig_class, use_container_width=True)
 
     render_good_practices(df_scored, spec)
-
-    st.markdown("### Consolidado por equipe")
-    if "equipe" in df_scored.columns:
-        by_team = (
-            df_scored.groupby("equipe", dropna=False)
-            .agg(total=("nome", "count"), score_medio=("score", "mean"), pendencias=("pendencias", "sum"))
-            .reset_index()
-            .sort_values(["score_medio", "total"], ascending=[False, False])
-        )
-        st.dataframe(by_team, use_container_width=True)
-
     render_nominal(df_scored, spec)
 
 
 def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     df_calc, indicador = calculate_percentual_indicator(df, spec)
     total = len(df_calc)
-    cobertos = int(pd.to_numeric(df_calc["numerador"], errors="coerce").fillna(0).sum())
-    elegiveis = int(pd.to_numeric(df_calc["denominador"], errors="coerce").fillna(0).sum())
     desempenho = classificar_score(indicador)
 
     c1, c2, c3 = st.columns(3)
@@ -710,7 +801,11 @@ def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
             .agg(numerador=("numerador", "sum"), denominador=("denominador", "sum"))
             .reset_index()
         )
-        by_team["percentual"] = np.where(by_team["denominador"] > 0, by_team["numerador"] / by_team["denominador"] * 100, 0)
+        by_team["percentual"] = np.where(
+            by_team["denominador"] > 0,
+            by_team["numerador"] / by_team["denominador"] * 100,
+            0,
+        )
         st.dataframe(by_team, use_container_width=True)
         fig = px.bar(by_team, x="equipe", y="percentual", title="Indicador por equipe")
         st.plotly_chart(fig, use_container_width=True)
@@ -722,13 +817,34 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     st.markdown("### Lista nominal")
 
     preferred_cols = [
-        "nome", "cpf", "cns", "idade", "faixa_etaria", "endereco",
-        "equipe", "micro_area", "equipe_vinculo", "tipo_equipe",
-        "score", "classificacao", "pendencias",
-        "cadastro_ok", "atendimento_ok", "consulta_ok", "pa_ok",
-        "antropometria_ok", "visita_ok", "visitas_ok", "hba1c_ok",
-        "pes_ok", "influenza_ok", "citopatologico_ok", "mamografia_ok", "exame_ok",
+        "nome",
+        "cpf",
+        "cns",
+        "idade",
+        "faixa_etaria",
+        "endereco",
+        "equipe",
+        "micro_area",
+        "equipe_vinculo",
+        "tipo_equipe",
+        "score",
+        "classificacao",
+        "pendencias",
+        "cadastro_ok",
+        "atendimento_ok",
+        "consulta_ok",
+        "pa_ok",
+        "antropometria_ok",
+        "visita_ok",
+        "visitas_ok",
+        "hba1c_ok",
+        "pes_ok",
+        "influenza_ok",
+        "citopatologico_ok",
+        "mamografia_ok",
+        "exame_ok",
     ]
+
     cols = [c for c in preferred_cols if c in df.columns]
     if not cols:
         cols = list(df.columns)
@@ -755,12 +871,17 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
 # Aplicação
 # =========================
 
+
 def main():
     st.title("Saúde 360 APS - Dashboard multipainel")
-    st.caption("Painel expandido para os 7 indicadores com leitura flexível de relatórios e cálculo operacional local.")
+    st.caption(
+        "Painel expandido para os 7 indicadores com leitura flexível de relatórios e cálculo operacional local."
+    )
 
     st.sidebar.header("Importação")
-    uploaded_file = st.sidebar.file_uploader("Envie um relatório CSV/XLS/XLSX", type=["csv", "xls", "xlsx"])
+    uploaded_file = st.sidebar.file_uploader(
+        "Envie um relatório CSV/XLS/XLSX", type=["csv", "xls", "xlsx"]
+    )
 
     st.sidebar.header("Indicador")
     manual_indicator = st.sidebar.selectbox(
@@ -769,7 +890,9 @@ def main():
     )
 
     if uploaded_file is None:
-        st.info("Envie um relatório para começar. O app tenta identificar o indicador automaticamente pelo nome do arquivo e pelas colunas.")
+        st.info(
+            "Envie um relatório para começar. O app tenta identificar o indicador automaticamente pelo nome do arquivo e pelas colunas."
+        )
         st.stop()
 
     try:
@@ -778,16 +901,24 @@ def main():
         st.error(f"Erro ao ler o arquivo: {e}")
         st.stop()
 
-    detected = detect_indicator_from_columns(pd.DataFrame(columns=[normalize_col(c) for c in df_raw.columns]), uploaded_file.name)
-    selected_code = manual_indicator.split(" ")[0] if manual_indicator != "Automático" else detected
+    detected = detect_indicator_from_columns(
+        pd.DataFrame(columns=[normalize_col(c) for c in df_raw.columns]),
+        uploaded_file.name,
+    )
+    selected_code = (
+        manual_indicator.split(" ")[0]
+        if manual_indicator != "Automático"
+        else detected
+    )
     if selected_code is None:
-        st.warning("Não foi possível identificar automaticamente o indicador. Escolha manualmente na barra lateral.")
+        st.warning(
+            "Não foi possível identificar automaticamente o indicador. Escolha manualmente na barra lateral."
+        )
         st.stop()
 
     spec = INDICATORS[selected_code]
     df = preprocess_df(df_raw, selected_code)
 
-    # Filtros globais que impactam todo o painel
     df_filtered, pend_label = apply_global_filters(df, spec)
 
     st.success(f"Indicador em análise: {spec.code} - {spec.name}")
@@ -810,7 +941,9 @@ def main():
             {
                 "coluna": df.columns,
                 "nulos": [int(df[c].isna().sum()) for c in df.columns],
-                "vazios": [int((df[c].astype(str).str.strip() == "").sum()) for c in df.columns],
+                "vazios": [
+                    int((df[c].astype(str).str.strip() == "").sum()) for c in df.columns
+                ],
                 "unicos": [int(df[c].nunique(dropna=True)) for c in df.columns],
             }
         )
