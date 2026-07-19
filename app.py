@@ -498,7 +498,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         )
         df["c4_b_ok"] = (
             to_bool(df["afericao_de_pa"])
-            if "afericao_de_pa"] in df.columns
+            if "afericao_de_pa" in df.columns
             else df.get("pa_ok", False)
         )
         if "qtd_registros_de_peso_altura" in df.columns:
