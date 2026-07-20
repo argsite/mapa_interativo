@@ -372,11 +372,14 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
         df["consulta_ok"] = False
 
     if "afericao_de_pressao_arterial" in df.columns:
-        df["c5_b_ok"] = to_bool(df["afericao_de_pressao_arterial"])
+        df["pa_ok"] = to_bool(df["afericao_de_pressao_arterial"])
+        df["c5_b_ok"] = df["pa_ok"]
     elif "afericao_de_pa" in df.columns:
-        df["c5_b_ok"] = to_bool(df["afericao_de_pa"])
+        df["pa_ok"] = to_bool(df["afericao_de_pa"])
+        df["c5_b_ok"] = df["pa_ok"]
     else:
-        df["c5_b_ok"] = df.get("pa_ok", False)
+        df["pa_ok"] = False
+        df["c5_b_ok"] = False
 
     if "hemoglobina_glicada" in df.columns:
         df["hba1c_ok"] = to_bool(df["hemoglobina_glicada"])
