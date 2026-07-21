@@ -789,19 +789,55 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     if not cols:
         cols = list(df.columns)
 
+    col_labels = {
+        "nome": "Nome",
+        "cpf": "CPF",
+        "cns": "CNS",
+        "idade": "Idade",
+        "faixa_etaria": "Faixa etária",
+        "endereco": "Endereço",
+        "equipe": "Equipe",
+        "micro_area": "Microárea",
+        "equipe_vinculo": "Equipe vínculo",
+        "tipo_equipe": "Tipo equipe",
+        "score": "Score",
+        "classificacao": "Classificação",
+        "pendencias": "Pendências",
+        "cadastro_ok": "Cadastro OK",
+        "atendimento_ok": "Atendimento OK",
+        "consulta_ok": "Consulta OK",
+        "pa_ok": "Aferição de PA",
+        "antropometria_ok": "Antropometria OK",
+        "visita_ok": "Visita OK",
+        "visitas_ok": "Visitas OK",
+        "hba1c_ok": "HBA1c OK",
+        "pes_ok": "Avaliação dos pés OK",
+        "influenza_ok": "Influenza OK",
+        "citopatologico_ok": "Citopatológico OK",
+        "mamografia_ok": "Mamografia OK",
+        "exame_ok": "Exame OK",
+    }
+
+    df_display = df[cols].rename(
+        columns={c: col_labels.get(c, c.replace("_", " ").title()) for c in cols}
+    )
+
     bp_df = build_good_practices_df(df, spec)
     if bp_df.empty:
-        st.dataframe(df[cols], use_container_width=True, height=420)
-        csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
+        st.dataframe(df_display, use_container_width=True, height=420)
+        st.caption(f"Total de pacientes exibidos: {len(df_display)}")
+
+        csv_bytes = df_display.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
             "Baixar CSV filtrado",
             data=csv_bytes,
             file_name=f"{spec.code.lower()}_lista_filtrada.csv",
             mime="text/csv",
         )
+
         st.download_button(
             "Baixar Excel filtrado",
-            data=export_excel_bytes(df[cols]),
+            data=export_excel_bytes(df_display),
             file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
@@ -821,9 +857,10 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     tabs = st.tabs(tab_labels)
 
     with tabs[0]:
-        st.dataframe(df[cols], use_container_width=True, height=420)
-        st.caption(f"Total de pacientes exibidos: {len(df)}")
-        csv_bytes = df[cols].to_csv(index=False).encode("utf-8-sig")
+        st.dataframe(df_display, use_container_width=True, height=420)
+        st.caption(f"Total de pacientes exibidos: {len(df_display)}")
+
+        csv_bytes = df_display.to_csv(index=False).encode("utf-8-sig")
         st.download_button(
             "Baixar CSV filtrado",
             data=csv_bytes,
@@ -831,9 +868,10 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
             mime="text/csv",
             key=f"{spec.code}_csv_all",
         )
+
         st.download_button(
             "Baixar Excel filtrado",
-            data=export_excel_bytes(df[cols]),
+            data=export_excel_bytes(df_display),
             file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"{spec.code}_xlsx_all",
@@ -846,10 +884,15 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         else:
             filtered = df[~to_bool(df[col_bp])].copy()
 
+        filtered_display = filtered[cols].rename(
+            columns={c: col_labels.get(c, c.replace("_", " ").title()) for c in cols}
+        )
+
         with tabs[i]:
-            st.dataframe(filtered[cols], use_container_width=True, height=420)
-            st.caption(f"Total de pacientes exibidos: {len(filtered)}")
-            csv_bytes = filtered[cols].to_csv(index=False).encode("utf-8-sig")
+            st.dataframe(filtered_display, use_container_width=True, height=420)
+            st.caption(f"Total de pacientes exibidos: {len(filtered_display)}")
+
+            csv_bytes = filtered_display.to_csv(index=False).encode("utf-8-sig")
             st.download_button(
                 "Baixar CSV filtrado",
                 data=csv_bytes,
@@ -857,14 +900,14 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
                 mime="text/csv",
                 key=f"{spec.code}_csv_{letra}",
             )
+
             st.download_button(
                 "Baixar Excel filtrado",
-                data=export_excel_bytes(filtered[cols]),
+                data=export_excel_bytes(filtered_display),
                 file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{spec.code}_xlsx_{letra}",
-            )
-        
+            )        
 # =========================
 # Aplicação
 # =========================
