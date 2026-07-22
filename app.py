@@ -706,6 +706,35 @@ def export_excel_bytes(df: pd.DataFrame) -> bytes:
     buffer.seek(0)
     return buffer.read()
 
+def render_c7_age_dashboard(df: pd.DataFrame):
+    age_rows = []
+    rules = [
+        ("A - 25-64", "c7_a_ok", (25, 64)),
+        ("B - 9-14", "c7_b_ok", (9, 14)),
+        ("C - 14-69", "c7_c_ok", (14, 69)),
+        ("D - 50-69", "c7_d_ok", (50, 69)),
+    ]
+    for label, col, (lo, hi) in rules:
+        if "idade" in df.columns:
+            subset = df[df["idade"].between(lo, hi, inclusive="both")].copy()
+        else:
+            subset = df.iloc[0:0].copy()
+        elegiveis = len(subset)
+        positivos = int(to_bool(subset[col]).sum()) if col in subset.columns else 0
+        age_rows.append({"Faixa etária": label, "Elegíveis": elegiveis, "Boas práticas positivas": positivos})
+
+    age_df = pd.DataFrame(age_rows)
+    fig = px.bar(
+        age_df,
+        x="Faixa etária",
+        y=["Elegíveis", "Boas práticas positivas"],
+        barmode="group",
+        title="C7 por faixa etária",
+        labels={"value": "Quantidade", "variable": "Série"},
+    )
+    fig.update_layout(xaxis_title="Faixa etária", yaxis_title="Quantidade")
+    st.plotly_chart(fig, use_container_width=True)
+
 
 def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     df_scored = calculate_score_indicator(df, spec)
