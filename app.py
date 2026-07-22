@@ -729,7 +729,7 @@ def render_c7_age_dashboard(df: pd.DataFrame):
         x="Faixa etária",
         y=["Elegíveis", "Boas práticas positivas"],
         barmode="group",
-        title="C7 por faixa etária",
+        title="Distribuição de pacientes e boas práticas por faixa etária",
         labels={"value": "Quantidade", "variable": "Série"},
     )
     fig.update_layout(xaxis_title="Faixa etária", yaxis_title="Quantidade")
