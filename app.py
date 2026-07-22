@@ -667,17 +667,7 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
         ma_sel = st.multiselect("Por microárea", microareas)
         fx_sel = st.multiselect("Por faixa etária", faixas)
 
-        bp_df_full = build_good_practices_df(df, spec)
-        pend_options = ["Todos"]
-        label_to_col: Dict[str, str] = {}
-        for _, row in bp_df_full.iterrows():
-            label = row["Boa prática"]
-            col = row["coluna"]
-            pend_options.append(label)
-            label_to_col[label] = col
-        if "pendencias" in df.columns:
-            pend_options.insert(1, "Sem pendências")
-
+   
     out = df.copy()
     if eq_sel:
         out = out[out["equipe"].astype(str).isin(eq_sel)]
@@ -685,13 +675,6 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
         out = out[out["micro_area"].astype(str).isin(ma_sel)]
     if fx_sel:
         out = out[out["faixa_etaria"].astype(str).isin(fx_sel)]
-
-    if pend_sel == "Sem pendências" and "pendencias" in out.columns:
-        out = out[out["pendencias"] == 0]
-    elif pend_sel != "Todos" and pend_sel in label_to_col:
-        col = label_to_col[pend_sel]
-        if col in out.columns:
-            out = out[~to_bool(out[col])]
 
     selected_label = pend_sel if pend_sel != "Todos" else None
     return out, selected_label
