@@ -538,8 +538,6 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
                 break
     
         if consulta_1m_col:
-            # Debug opcional: guardar o nome da coluna encontrada
-            df["_debug_c2_a_col"] = consulta_1m_col
             # Usar essa coluna para marcar a boa prática A
             df["c2_a_ok"] = to_bool(df[consulta_1m_col])
     
@@ -814,40 +812,6 @@ def render_c7_age_dashboard(df: pd.DataFrame):
     )
     fig.update_layout(xaxis_title="Faixa etária", yaxis_title="Quantidade")
     st.plotly_chart(fig, use_container_width=True)
-
-##TESTE
-
-import streamlit as st
-
-def debug_c2(df):
-    st.markdown("### Debug C2")
-    st.write("Colunas atuais:", list(df.columns))
-
-    # Verificar se coluna da planilha está presente
-    has_raw = "consulta_medica_enfermagem_1_mes" in df.columns
-    st.write("consulta_medica_enfermagem_1_mes presente?", has_raw)
-    if has_raw:
-        st.write(
-            "Valores únicos em consulta_medica_enfermagem_1_mes:",
-            df["consulta_medica_enfermagem_1_mes"].unique(),
-        )
-
-    # Verificar se c2_a_ok foi criada
-    has_c2a = "c2_a_ok" in df.columns
-    st.write("c2_a_ok presente?", has_c2a)
-    if has_c2a:
-        st.write(
-            "Contagem de c2_a_ok (True):",
-            int(
-                (
-                    df["c2_a_ok"]
-                    .astype(str)
-                    .str.lower()
-                    .isin(["true", "1", "sim", "s", "x", "ok", "yes"])
-                ).sum()
-            ),
-        )
-        st.write("Valores únicos em c2_a_ok:", df["c2_a_ok"].unique())
 
     # Mostrar algumas linhas com as duas colunas lado a lado
     cols = []
@@ -1180,8 +1144,6 @@ def main():
     df = preprocess_df(df_raw, selected_code)
 
     df_filtered, _ = apply_global_filters(df, spec)
-    if selected_code == "C2":
-        debug_c2(df_filtered)
 
     team_display = None
     if "equipe" in df_filtered.columns:
