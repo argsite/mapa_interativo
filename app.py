@@ -373,7 +373,7 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     map_first(df, "data_nascimento", ["data_nascimento", "dt_nascimento", "nascimento", "data_nasc", "data_de_nascimento"])
     map_first(df, "idade", ["idade"])
     map_first(df, "endereco", ["endereco", "logradouro"])
-    map_first(df, "equipe", ["equipe", "equipe_area", "equipe_de_area"])
+    map_first(df, "equipe", ["equipe_area", "equipe", "equipe_vinculo", "equipe_de_area"])
     map_first(df, "micro_area", ["micro_area", "microarea"])
     map_first(df, "equipe_vinculo", ["equipe_vinculo", "equipe_de_vinculo"])
     map_first(df, "cadastro_atualizado", ["cadastro_atualizado"])
@@ -1042,9 +1042,19 @@ def main():
 
     df_filtered, pend_label = apply_global_filters(df, spec)
 
-    st.success(f"Indicador em análise: {spec.code} - {spec.name}")
-    if pend_label:
-        st.caption(f"Filtro de pendências aplicado: {pend_label}")
+    team_display = None
+if "equipe" in df_filtered.columns:
+    vals = [str(v).strip() for v in df_filtered["equipe"].dropna().astype(str) if str(v).strip()]
+    uniq = sorted(set(vals))
+    if len(uniq) == 1:
+        team_display = uniq[0]
+    elif len(uniq) > 1:
+        team_display = " / ".join(uniq)
+
+if team_display:
+    st.success(f"Equipe em análise: {team_display}")
+else:
+    st.success("Equipe em análise: não identificada")
 
     st.markdown(f"## {spec.code} - {spec.name}")
     st.write(spec.description)
