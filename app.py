@@ -139,6 +139,55 @@ def friendly_team_name(df: pd.DataFrame) -> str:
             return slugify_filename("_".join(teams))
     return "todas_as_equipes"
 
+TAB_SHORT_LABELS = {
+    "C2": {
+        "A": "Consulta precoce",
+        "B": "Consultas",
+        "C": "Peso e altura",
+        "D": "Visita domiciliar",
+        "E": "Vacinas",
+    },
+    "C3": {
+        "A": "Consulta inicial",
+        "B": "Consultas pré-natal",
+        "C": "Pressão arterial",
+        "D": "Peso e altura",
+        "E": "Visitas domiciliares",
+        "F": "dTpa",
+        "G": "Exames 1º tri",
+        "H": "Exames 3º tri",
+        "I": "Puerpério",
+        "J": "Visita puerpério",
+        "K": "Saúde bucal",
+    },
+    "C4": {
+        "A": "Consulta",
+        "B": "Pressão arterial",
+        "C": "Peso e altura",
+        "D": "Visitas domiciliares",
+        "E": "Hemoglobina glicada",
+        "F": "Avaliação dos pés",
+    },
+    "C5": {
+        "A": "Consulta",
+        "B": "Pressão arterial",
+        "C": "Peso e altura",
+        "D": "Visitas domiciliares",
+    },
+    "C6": {
+        "A": "Consulta",
+        "B": "Peso e altura",
+        "C": "Visitas domiciliares",
+        "D": "Influenza",
+    },
+    "C7": {
+        "A": "Exame citopatológico",
+        "B": "Vacina HPV",
+        "C": "Saúde reprodutiva",
+        "D": "Mamografia",
+    },
+}
+
 # =========================
 # Especificações
 # =========================
@@ -937,8 +986,10 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         if letra and letra not in letters:
             letters.append(letra)
 
-    tab_labels = ["Lista nominal"] + [f"Pendência {l}" for l in letters]
-    tabs = st.tabs(tab_labels)
+    tab_labels = ["Lista nominal"] + [
+    f"Pendência {l} - {TAB_SHORT_LABELS.get(spec.code, {}).get(l, l)}"
+    for l in letters
+]
 
     with tabs[0]:
         st.dataframe(df_display, use_container_width=True, height=420)
