@@ -528,16 +528,29 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
 
     # C7
     if indicator_code == "C7":
-        if "citopatologico_ou_hpv_ok" in df.columns:
-            df["c7_a_ok"] = to_bool(df["citopatologico_ou_hpv_ok"])
-        else:
-            df["c7_a_ok"] = df.get("citopatologico_ok", False)
-        if "vacina_hpv_ok" in df.columns:
-            df["c7_b_ok"] = to_bool(df["vacina_hpv_ok"])
-        if "saude_sexual_reprodutiva_ok" in df.columns:
-            df["c7_c_ok"] = to_bool(df["saude_sexual_reprodutiva_ok"])
-        if "mamografia_ok" in df.columns:
-            df["c7_d_ok"] = to_bool(df["mamografia_ok"])
+        c7_map = {
+            "c7_a_ok": ["rast_cancer_do_colo_do_utero", "rast_cancer_do_colo_do_tero", "rast_cancer_do_colodo_utero", "c7_a_ok"],
+            "c7_b_ok": ["vacina_hpv_entre_9_e_14_anos", "vacina_hpv", "c7_b_ok"],
+            "c7_c_ok": ["atend_saude_reprodutiva", "atendimento_saude_reprodutiva", "saude_sexual_reprodutiva", "c7_c_ok"],
+            "c7_d_ok": ["rast_cancer_de_mama", "rast_cancer_da_mama", "mamografia", "c7_d_ok"],
+        }
+        for target, candidates in c7_map.items():
+            src = first_existing(df, candidates)
+            if src is not None:
+                df[target] = to_bool(df[src])
+            elif target not in df.columns:
+                df[target] = False
+
+        age = df["idade"]
+        df["c7_a_applicable"] = age.between(25, 64, inclusive="both")
+        df["c7_b_applicable"] = age.between(9, 14, inclusive="both")
+        df["c7_c_applicable"] = age.between(14, 69, inclusive="both")
+        df["c7_d_applicable"] = age.between(50, 69, inclusive="both")
+
+        df["c7_a_ok"] = df["c7_a_ok"] & df["c7_a_applicable"]
+        df["c7_b_ok"] = df["c7_b_ok"] & df["c7_b_applicable"]
+        df["c7_c_ok"] = df["c7_c_ok"] & df["c7_c_applicable"]
+        df["c7_d_ok"] = df["c7_d_ok"] & df["c7_d_applicable"]
 
     return df
 
