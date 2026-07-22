@@ -955,7 +955,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
                 file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{spec.code}_xlsx_{letra}",
-            ) 
+            )
 # =========================
 # Aplicação
 # =========================
