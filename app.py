@@ -111,6 +111,33 @@ def infer_tipo_equipe_from_text(series: pd.Series) -> pd.Series:
     )
     return pd.Series(out, index=series.index)
 
+# Nomes arquivos exportados
+def slugify_filename(text: str) -> str:
+    text = strip_accents(str(text)).lower().strip()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text or "arquivo"
+
+def friendly_indicator_name(spec: IndicatorSpec) -> str:
+    return slugify_filename(spec.name)
+
+def friendly_pendencia_name(letra: str) -> str:
+    return slugify_filename(f"pendencia_{letra}")
+
+def friendly_team_name(df: pd.DataFrame) -> str:
+    if "equipe" in df.columns and df["equipe"].notna().any():
+        teams = sorted({str(v).strip() for v in df["equipe"].dropna().astype(str) if str(v).strip()})
+        if len(teams) == 1:
+            return slugify_filename(teams[0])
+        if len(teams) > 1:
+            return slugify_filename("_".join(teams))
+    if "equipe_vinculo" in df.columns and df["equipe_vinculo"].notna().any():
+        teams = sorted({str(v).strip() for v in df["equipe_vinculo"].dropna().astype(str) if str(v).strip()})
+        if len(teams) == 1:
+            return slugify_filename(teams[0])
+        if len(teams) > 1:
+            return slugify_filename("_".join(teams))
+    return "todas_as_equipes"
 
 # =========================
 # Especificações
@@ -877,14 +904,14 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         st.download_button(
             "Baixar CSV filtrado",
             data=csv_bytes,
-            file_name=f"{spec.code.lower()}_lista_filtrada.csv",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_team_name(df)}.csv",
             mime="text/csv",
         )
 
         st.download_button(
             "Baixar Excel filtrado",
             data=export_excel_bytes(df_display),
-            file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_team_name(df)}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         return
@@ -910,7 +937,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         st.download_button(
             "Baixar CSV filtrado",
             data=csv_bytes,
-            file_name=f"{spec.code.lower()}_lista_filtrada.csv",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.csv"
             mime="text/csv",
             key=f"{spec.code}_csv_all",
         )
@@ -918,7 +945,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
         st.download_button(
             "Baixar Excel filtrado",
             data=export_excel_bytes(df_display),
-            file_name=f"{spec.code.lower()}_lista_filtrada.xlsx",
+            file_name=f"lista_nominal_{friendly_indicator_name(spec)}_{friendly_pendencia_name(letra)}_{friendly_team_name(df)}.xlsx"
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"{spec.code}_xlsx_all",
         )
