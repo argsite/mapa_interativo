@@ -784,6 +784,171 @@ def export_excel_bytes(df: pd.DataFrame, title: Optional[str] = None) -> bytes:
     buffer.seek(0)
     return buffer.read()
 
+# =========================
+# Vacinação infantil (C2)
+# =========================
+
+VACCINE_COL_MAP = {
+    "Vacina Pentavalente": "vacina_pentavalente",
+    "Vacina Pólio Injetável": "vacina_polio_injetavel",
+    "Vacina Sarampo, Caxumba e Rubéola": "vacina_sarampo_caxumba_e_rubeola",
+    "Vacina Pneumocócica": "vacina_pneumococica",
+}
+
+
+def build_vaccination_summary(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for label, raw_col in VACCINE_COL_MAP.items():
+        if raw_col not in df.columns:
+            continue
+        series = df[raw_col].astype(str).str.strip().str.lower()
+        realizados = int(
+            series.isin(["s", "sim", "1", "true", "ok", "x", "yes"]).sum()
+        )
+        pendentes = int(
+            series.isin(["n", "nao", "não", "0", "false"]).sum()
+        )
+        total = realizados + pendentes
+        perc = (realizados / total * 100) if total > 0 else 0.0
+        rows.append(
+            {
+                "Vacina": label,
+                "Realizados": realizados,
+                "Pendentes": pendentes,
+                "% realizado": round(perc, 1),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_vaccination_pending_df(df: pd.DataFrame) -> pd.DataFrame:
+    # Pacientes com pelo menos uma vacina pendente
+    mask_any_pending = pd.Series(False, index=df.index)
+    for raw_col in VACCINE_COL_MAP.values():
+        if raw_col not in df.columns:
+            continue
+        series = df[raw_col].astype(str).str.strip().str.lower()
+        mask_any_pending = mask_any_pending | series.isin(
+            ["n", "nao", "não", "0", "false"]
+        )
+
+    base_cols = [
+        "nome",
+        "cpf",
+        "cns",
+        "idade",
+        "faixa_etaria",
+        "endereco",
+        "equipe",
+        "micro_area",
+    ]
+    cols_present = [c for c in base_cols if c in df.columns]
+    vaccine_cols_present = [
+        c for c in VACCINE_COL_MAP.values() if c in df.columns
+    ]
+
+    pending_df = df[mask_any_pending].copy()
+    pending_df = pending_df[cols_present + vaccine_cols_present]
+
+    # Renomear cabeçalhos das vacinas para rótulos amigáveis
+    rename_map = {
+        raw: label
+        for label, raw in VACCINE_COL_MAP.items()
+        if raw in pending_df.columns
+    }
+    pending_df = pending_df.rename(columns=rename_map)
+    return pending_df
+
+
+def render_vaccination_section(df: pd.DataFrame):
+    st.markdown("### Vacinação infantil - pendências e cobertura")
+
+    summary_df = build_vaccination_summary(df)
+    pending_df = build_vaccination_pending_df(df)
+
+    if summary_df.empty:
+        st.info(
+            "Não foi possível identificar colunas de vacinação infantil neste relatório."
+        )
+        return
+
+    # Tabela de resumo por vacina
+    st.subheader("Resumo por vacina")
+    display_summary = summary_df.copy()
+    display_summary["% realizado"] = display_summary["% realizado"].map(
+        lambda v: f"{v:.1f}%" if pd.notna(v) else ""
+    )
+    st.dataframe(display_summary, use_container_width=True)
+
+    # Gráfico de barras de cobertura
+    fig = px.bar(
+        summary_df,
+        x="Vacina",
+        y="% realizado",
+        text="% realizado",
+        title="Percentual de crianças com esquema realizado por vacina",
+    )
+    fig.update_layout(xaxis_title="Vacina", yaxis_title="% realizado")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Lista nominal de pacientes com alguma vacina pendente
+    st.subheader("Lista de pacientes com vacinas pendentes")
+    st.dataframe(pending_df, use_container_width=True, height=360)
+    st.caption(
+        f"Total de pacientes com alguma vacina pendente: {len(pending_df)}"
+    )
+
+    # Exportar CSV/Excel da lista de pacientes com vacinas pendentes (geral)
+    csv_bytes = pending_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "Baixar CSV - pendências de vacinação (geral)",
+        data=csv_bytes,
+        file_name="pendencias_vacinacao_geral.csv",
+        mime="text/csv",
+        key="c2_vacinas_csv_geral",
+    )
+
+    st.download_button(
+        "Baixar Excel - pendências de vacinação (geral)",
+        data=export_excel_bytes(pending_df),
+        file_name="pendencias_vacinacao_geral.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="c2_vacinas_xlsx_geral",
+    )
+
+    # Exportar por vacina (pendentes específicos)
+    st.markdown("#### Exportar pendências específicas por vacina")
+    for label, raw_col in VACCINE_COL_MAP.items():
+        if raw_col not in df.columns:
+            continue
+        series = df[raw_col].astype(str).str.strip().str.lower()
+        mask_pending = series.isin(["n", "nao", "não", "0", "false"])
+        pend_df_vac = df[mask_pending].copy()
+        if pend_df_vac.empty:
+            continue
+
+        # Usar as mesmas colunas da lista geral, quando existirem
+        cols_for_vac = [
+            c for c in pending_df.columns if c in pend_df_vac.columns
+        ]
+        pend_df_vac = pend_df_vac[cols_for_vac]
+
+        csv_bytes_v = pend_df_vac.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            f"Baixar CSV - pendências de {label}",
+            data=csv_bytes_v,
+            file_name=f"pendencias_{raw_col}.csv",
+            mime="text/csv",
+            key=f"c2_vacinas_csv_{raw_col}",
+        )
+        st.download_button(
+            f"Baixar Excel - pendências de {label}",
+            data=export_excel_bytes(pend_df_vac),
+            file_name=f"pendencias_{raw_col}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"c2_vacinas_xlsx_{raw_col}",
+        )
+
 def render_c7_age_dashboard(df: pd.DataFrame):
     age_rows = []
     rules = [
@@ -871,6 +1036,9 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     render_good_practices(df_scored, spec)
     render_nominal(df_scored, spec)
 
+    # Abaixo da lista nominal, apenas para C2
+    if spec.code == "C2":
+        render_vaccination_section(df_scored)
 
 def render_percentual_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
     df_calc, indicador = calculate_percentual_indicator(df, spec)
