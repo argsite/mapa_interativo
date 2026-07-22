@@ -748,10 +748,14 @@ def render_good_practices(df: pd.DataFrame, spec: IndicatorSpec):
     )
 
 
-def export_excel_bytes(df: pd.DataFrame) -> bytes:
+def export_excel_bytes(df: pd.DataFrame, title: Optional[str] = None) -> bytes:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="dados")
+        startrow = 0
+        if title:
+            pd.DataFrame([[title]]).to_excel(writer, index=False, header=False, sheet_name="dados", startrow=0)
+            startrow = 2
+        df.to_excel(writer, index=False, sheet_name="dados", startrow=startrow)
     buffer.seek(0)
     return buffer.read()
 
