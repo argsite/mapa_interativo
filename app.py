@@ -678,8 +678,6 @@ def apply_global_filters(df: pd.DataFrame, spec: IndicatorSpec) -> Tuple[pd.Data
         if "pendencias" in df.columns:
             pend_options.insert(1, "Sem pendências")
 
-        pend_sel = st.selectbox("Por pendências", pend_options)
-
     out = df.copy()
     if eq_sel:
         out = out[out["equipe"].astype(str).isin(eq_sel)]
