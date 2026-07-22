@@ -732,7 +732,7 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
                     x="Letra",
                     y="% Realizado",
                     text="% Realizado",
-                    title="Percentual de realização por boa prática)",
+                    title="Percentual de realização por boa prática (A–E)",
                 )
                 fig_bp.update_layout(xaxis_title="Boa prática", yaxis_title="%")
                 st.plotly_chart(fig_bp, use_container_width=True)
@@ -747,6 +747,9 @@ def render_score_dashboard(df: pd.DataFrame, spec: IndicatorSpec):
             title="Distribuição dos pacientes por faixa de desempenho",
         )
         st.plotly_chart(fig_class, use_container_width=True)
+
+    if spec.code == "C7":
+        render_c7_age_dashboard(df_scored)
 
     render_good_practices(df_scored, spec)
     render_nominal(df_scored, spec)
