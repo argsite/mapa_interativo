@@ -597,11 +597,18 @@ def calculate_percentual_indicator(df: pd.DataFrame, spec: IndicatorSpec) -> Tup
 def build_good_practices_df(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     rows = []
     weights = spec.weights or {}
+    age_rules = {"A": (25, 64), "B": (9, 14), "C": (14, 69), "D": (50, 69)} if spec.code == "C7" else {}
+
     for col, peso in weights.items():
         if col not in df.columns:
             continue
-        total = len(df)
-        realizados = int(to_bool(df[col]).sum())
+        subset = df
+        letra = label_boa_pratica(spec.code, col)[:1].upper()
+        if spec.code == "C7" and letra in age_rules and "idade" in df.columns:
+            lo, hi = age_rules[letra]
+            subset = df[df["idade"].between(lo, hi, inclusive="both")].copy()
+        total = len(subset)
+        realizados = int(to_bool(subset[col]).sum())
         nao_realizados = max(total - realizados, 0)
         perc = round((realizados / total) * 100, 1) if total else 0.0
         rows.append(
