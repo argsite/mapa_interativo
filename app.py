@@ -913,12 +913,17 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
             key=f"{spec.code}_xlsx_all",
         )
 
+    c7_age_rules = {"A": (25, 64), "B": (9, 14), "C": (14, 69), "D": (50, 69)} if spec.code == "C7" else {}
+
     for i, letra in enumerate(letters, start=1):
         col_bp = label_to_col.get(letra)
         if col_bp not in df.columns:
             filtered = df.iloc[0:0].copy()
         else:
             filtered = df[~to_bool(df[col_bp])].copy()
+            if spec.code == "C7" and letra in c7_age_rules and "idade" in filtered.columns:
+                lo, hi = c7_age_rules[letra]
+                filtered = filtered[filtered["idade"].between(lo, hi, inclusive="both")].copy()
 
         filtered_display = filtered[cols].rename(
             columns={c: col_labels.get(c, c.replace("_", " ").title()) for c in cols}
@@ -943,7 +948,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
                 file_name=f"{spec.code.lower()}_pendencia_{letra}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{spec.code}_xlsx_{letra}",
-            )   
+            ) 
 # =========================
 # Aplicação
 # =========================
