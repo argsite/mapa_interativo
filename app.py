@@ -753,6 +753,42 @@ def debug_c2_d(df):
         st.write("Amostra das colunas de visitas e C2 - D:")
         st.dataframe(df[show_cols].head())
 
+def preprocess_c2_visits(df: pd.DataFrame) -> pd.DataFrame:
+    # Garantir que colunas de visita domiciliar do C2 existam com nomes padrão
+    # após a normalização de cabeçalhos.
+
+    cols = list(df.columns)
+
+    # Candidatos para "visita domiciliar 1º mês"
+    v1_candidates = [
+        c
+        for c in cols
+        if "visita" in c
+        and "domiciliar" in c
+        and "1" in c
+        and "mes" in c
+    ]
+
+    # Candidatos para "visita domiciliar 6º mês"
+    v6_candidates = [
+        c
+        for c in cols
+        if "visita" in c
+        and "domiciliar" in c
+        and "6" in c
+        and "mes" in c
+    ]
+
+    if v1_candidates and "visita_domiciliar_1_mes" not in df.columns:
+        src = v1_candidates[0]
+        df["visita_domiciliar_1_mes"] = df[src]
+
+    if v6_candidates and "visita_domiciliar_6_mes" not in df.columns:
+        src = v6_candidates[0]
+        df["visita_domiciliar_6_mes"] = df[src]
+
+    return df
+
 
 
 # =========================
