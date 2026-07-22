@@ -989,7 +989,7 @@ def render_nominal(df: pd.DataFrame, spec: IndicatorSpec):
     tab_labels = ["Lista nominal"] + [
     f"Pendência {l} - {TAB_SHORT_LABELS.get(spec.code, {}).get(l, l)}"
     for l in letters
-]
+    ]
 
     with tabs[0]:
         st.dataframe(df_display, use_container_width=True, height=420)
