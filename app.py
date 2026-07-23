@@ -523,6 +523,9 @@ def preprocess_df(df: pd.DataFrame, indicator_code: Optional[str] = None) -> pd.
     if indicator_code == "C2":
         df = preprocess_c2_visits(df)
 
+    if indicator_code == "C3":
+        df = preprocess_c3_puerperio_visits(df)
+
     # C2
     if indicator_code == "C2":
         # A - 1ª consulta até 30 dias
